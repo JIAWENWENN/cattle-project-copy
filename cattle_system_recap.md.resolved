@@ -1,0 +1,396 @@
+# 🐄 Cattle Management System — Quick Recap for Interview
+
+> This document covers **everything you need to know** about your system to confidently explain it in an interview.
+
+---
+
+## 1. Tech Stack (What You Built It With)
+
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| **Backend Framework** | Laravel | 12 |
+| **Frontend Framework** | Vue.js (SPA feel) | 3.4 |
+| **Backend ↔ Frontend Bridge** | Inertia.js | 2.0 |
+| **CSS Framework** | Tailwind CSS | 3.4 |
+| **Database** | MySQL | - |
+| **Build Tool** | Vite | 7.0 |
+| **Auth Scaffold** | Laravel Breeze | 2.3 |
+| **Icons** | Lucide Vue Next | - |
+| **PDF Generation** | DomPDF + TCPDF | - |
+| **Excel Export** | PhpSpreadsheet | - |
+| **Route Sharing** | Ziggy (exposes Laravel routes to JS) | 2.0 |
+| **Server** | WAMP (Apache + MySQL + PHP 8.2) | - |
+
+### How to explain this in the interview:
+> "I built a full-stack web application using **Laravel 12** for the backend and **Vue 3** for the frontend, connected through **Inertia.js** which gives us a single-page app experience without building a separate API. The app runs on **MySQL** database and uses **Tailwind CSS** for styling. I use **Vite** as the build tool for fast development."
+
+---
+
+## 2. System Architecture (How It All Connects)
+
+```mermaid
+graph TD
+    Browser["🌐 Browser"] --> InertiaClient["Inertia.js (Client)"]
+    InertiaClient --> VuePages["Vue 3 Pages"]
+    VuePages --> AppLayout["AppLayout.vue (Sidebar + Navbar)"]
+    
+    Browser --> LaravelRouter["Laravel Router (web.php)"]
+    LaravelRouter --> Middleware["Middleware (Auth, Permission)"]
+    Middleware --> Controllers["Controllers (25 total)"]
+    Controllers --> Models["Eloquent Models (45 total)"]
+    Models --> MySQL["MySQL Database (cattlesystem)"]
+    
+    Controllers --> InertiaServer["Inertia::render()"]
+    InertiaServer --> VuePages
+```
+
+### Key Architecture Concepts:
+
+| Concept | What It Means |
+|---------|--------------|
+| **MVC Pattern** | Model (data) → Controller (logic) → View (Vue pages) |
+| **Inertia.js** | Instead of building REST APIs, controllers return `Inertia::render('PageName', data)` which directly sends data to Vue components. No need for axios/fetch calls for page loads. |
+| **Eloquent ORM** | Each database table has a PHP Model class. You interact with the DB using PHP objects instead of raw SQL. |
+| **Middleware** | Code that runs *before* your controller. Used for checking if user is logged in (`auth`) and checking permissions (`permission:ModuleName`). |
+
+---
+
+## 3. Database & Data Structure
+
+**Database name:** `cattlesystem`
+
+### Key Tables (mapped from Models):
+
+| Category | Models / Tables |
+|----------|----------------|
+| **Core Cattle** | [Cattle](file:///c:/wamp64/www/cattle-project/app/Models/Cattle.php#8-81), `CattleBreedingRecord`, `CattleCustomField`, `CattleHealthRecord`, `CattleMovement` |
+| **Calving (Birth)** | [CalvingRecord](file:///c:/wamp64/www/cattle-project/app/Models/CalvingRecord.php#8-219), `CalvingChecklist`, `CalvingMonthlyWorkflow`, `CalvingWorkflowAssignment` |
+| **Health** | [Treatment](file:///c:/wamp64/www/cattle-project/app/Models/Treatment.php#8-96), `TreatmentCode`, `TreatmentMonthlyWorkflow`, `TreatmentWorkflowAssignment`, `Medication`, `MedicationHistory`, `VeterinaryContact` |
+| **Mortality (Death)** | [MortalityCase](file:///c:/wamp64/www/cattle-project/app/Models/MortalityCase.php#8-105), `MortalityApproval`, `MortalityCustomField`, `PostmortemExamination` |
+| **Transfer** | [TransferDocument](file:///c:/wamp64/www/cattle-project/app/Models/TransferDocument.php#9-146), `TransferLivestock`, `TransferApproval`, `TransferWorkflowAssignment` |
+| **Grazing/Pasture** | `Estate`, `Herd`, `GrazingBlock`, `GrazingData`, `PastureBlock`, `PastureHerd`, `PasturePhase` |
+| **Inventory** | `Feed`, `FeedHistory`, `FeedingRecord`, `Stock`, `StockHistory`, `Supplier` |
+| **Users & Permissions** | [User](file:///c:/wamp64/www/cattle-project/app/Models/User.php#10-92), [Permission](file:///c:/wamp64/www/cattle-project/app/Models/User.php#68-81), `FieldLevelPermission`, `AuditLog` |
+| **Documents** | `DocumentEndorsement`, `DriverProfile`, `DeliveryRecord` |
+| **Tasks** | `Task` |
+
+---
+
+## 4. All Modules Explained (The Big Picture)
+
+### 🐮 Module 1: Cattle Management
+**What it does:** Register, track, and manage individual cattle.
+
+**Key data fields:** Tag No, LCC Running Number, Category, Breed, Coat Colour, Birth Date, Gender, Weight Milestones (receival, weaning, yearling), Dam/Sire Genealogy, Status, Location (block/phase).
+
+**Features:**
+- Full CRUD (Create, Read, Update, Delete)
+- Custom fields (dynamic fields admins can add)
+- Export to Excel
+- Profile picture upload
+- Relationships to treatments, movements, and breeding records
+
+**Route:** `/cattle` → `CattleController`
+
+---
+
+### 🍼 Module 2: Calving (Birth Records)
+**What it does:** Records when a calf is born — who the mother/father is, condition, treatments given.
+
+**Endorsement Workflow:**  
+`Issued → Verified → Checked → Witnessed → Approved`
+
+Each step is done by a different role (configurable via Access Control Matrix). The system tracks who signed off at each step with name, date, and digital signature.
+
+**Key data:** Company info, calf tag, calving date, sex (MC/FC), dam/sire details, herd, location, worker name.
+
+**Features:**
+- LCC Document download (official birth certificate)
+- Endorsement document upload/download at each step
+- Bulk delete
+- Export records
+- Filter by month and operating unit
+
+**Route:** `/calving` → `CalvingController`
+
+---
+
+### 📋 Module 3: Calving Checklist
+**What it does:** A monthly checklist form for calving records — ensures all steps are properly documented.
+
+**Same workflow:** Issued → Verified → Checked → Witnessed → Approved
+
+**Extra features:**
+- Batch endorsement (sign off on multiple records at once)
+- Export report
+- Monthly reporting
+
+**Route:** `/calving-checklist` → `CalvingChecklistController`
+
+---
+
+### 💀 Module 4: Mortality (Death Records)
+**What it does:** Records cattle deaths — what happened, when, where, cause of death.
+
+**Workflow:**  
+`Issued → Verified → Checked → Witness → Approved`
+
+**Post-Mortem Examination:** After recording a death, a PM examination form can be filled in with detailed findings.
+
+**Key data:** Cattle ID, LMC number, category, location, herd, block, death date, time, cause, treatment attempted.
+
+**Features:**
+- PM Examination module (detailed post-mortem form)
+- Pending approvals dashboard
+- Completed cases view
+- Custom fields
+- Endorsement document workflow with upload/download
+- Mark as completed
+
+**Route:** `/mortality` → `MortalityController`
+
+---
+
+### 💊 Module 5: Health & Treatment
+**What it does:** Records medical treatments given to cattle — symptoms, treatment applied, medication, dosage.
+
+**Workflow:**  
+`Prepared → Checked → Approved`
+
+**Key data:** Treatment number, cattle tag, category, operating unit, date, symptoms, treatment code, dosage, medication, follow-up scheduling.
+
+**Features:**
+- Monthly workflow (batch endorsement by month/year/unit)
+- Treatment codes management (predefined treatment categories)
+- Veterinary contact management
+- Endorsement document upload/download
+- Export report
+- Reopen completed records
+
+**Route:** `/health/treatment` → `HealthTreatmentController`
+
+---
+
+### 🚚 Module 6: Transfer (Cattle Movement Between Locations)
+**What it does:** Manages official transfer documents when cattle move between estates/locations.
+
+**3 Document Types:**
+| Type | Full Name | Purpose |
+|------|-----------|---------|
+| **CTV** | Cattle Transfer Voucher | Moving cattle out |
+| **Receival** | Receival Document | Receiving cattle in |
+| **SIV** | Sales Invoice Voucher | Selling cattle |
+
+**Workflow (8 steps!):**  
+`Issued → Approved → Transported → Witness Transit → Verified Transit → Witness Receive → Received → Completed`
+
+**Key data:** Document number, from/to location, date, vehicle number, driver details, livestock list.
+
+**Route:** `/transfer` → `TransferController`
+
+---
+
+### 🌿 Module 7: Pasture & Grazing
+**What it does:** Manages the physical land structure — estates, herds, blocks, and grazing phases.
+
+**Hierarchy:** `Estate → Herd → Block → Phase`
+
+**Features:**
+- Pasture management (operating units with herds and blocks)
+- Data Input page for grazing data
+- Herd Cards (detailed estate-level view with grazing details)
+
+**Routes:**
+- `/pasture/all` → Pasture management
+- `/data-input` → Grazing data input
+- `/herd-cards` → Herd card views
+
+---
+
+### 🍽️ Module 8: Feeding
+**What it does:** Records daily feeding activities for cattle herds.
+
+**Features:**
+- Feeding record CRUD
+- Schedule view
+- PDF export
+
+**Route:** `/feeding` → `FeedingController`
+
+---
+
+### 📦 Module 9: Inventory
+**What it does:** Tracks feed supplies, medications, and stock levels.
+
+**Sub-modules:**
+- **Feed Management** — manage feed types and quantities
+- **Medication Management** — track available medications
+- **Stock Alerts** — monitor stock levels, bulk operations, supplier management
+
+**Routes:** `/feeds`, `/medications`, `/inventory/stock`
+
+---
+
+### 🚗 Module 10: Driver & Delivery
+**What it does:** Manages driver profiles, shift schedules, and delivery history.
+
+**Route:** `/driver` → `DriverController` + `DeliveryRecordController`
+
+---
+
+### ✅ Module 11: Task Management
+**What it does:** Simple task tracking system with calendar view.
+
+**Route:** `/task` → `TaskController`
+
+---
+
+## 5. User & Permission System
+
+### User Model:
+- Fields: name, email, password, **role**, **status**, last_login_at
+- Roles are just strings (e.g., "Admin", "Livestock", "Supervisor", "Manager")
+- **Admins bypass all permission checks**
+
+### Permission System (3 layers):
+
+| Layer | What it controls |
+|-------|-----------------|
+| **Module Permissions** | Per-user access to modules: `no-access`, `view`, `create`, `edit`, `full`, `approve` |
+| **Field-Level Permissions** | Control which fields specific users can see/edit |
+| **Workflow Assignments** | Which users are assigned to each endorsement step |
+
+### How permissions work:
+1. Middleware `CheckModulePermission` runs before controller
+2. Checks [permissions](file:///c:/wamp64/www/cattle-project/app/Models/User.php#55-62) table: does this user have access to this module?
+3. Admins always pass (`role === 'admin'`)
+4. Each module has configurable workflow assignments (who can issue, verify, check, witness, approve)
+
+### Access Control Matrix:
+A single page (`/access-control`) where admins set all permissions for all users across all modules. Also configures workflow assignments for Treatment, Calving, and Transfer modules.
+
+---
+
+## 6. Endorsement Workflow Pattern (IMPORTANT — Used Everywhere!)
+
+This is the **core pattern** used across Mortality, Health, Calving, Calving Checklist, and Transfer modules:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                 ENDORSEMENT WORKFLOW                         │
+│                                                              │
+│  1. Record Created (status: pending)                         │
+│          ↓                                                   │
+│  2. Step-by-step approval by assigned users                  │
+│     Each step: user signs → uploads endorsement doc          │
+│          ↓                                                   │
+│  3. Final step reached → status: approved/completed          │
+│                                                              │
+│  At any step: can be REJECTED with reason                    │
+│  After completion: admin can REOPEN if needed                │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Technical implementation:**
+- Each record has `current_step`, `endorsement_step` (integer), `endorsement_documents` (JSON), and `status`
+- `endorsement_documents` stores uploaded file paths for each step
+- Controller methods: `issue()`, `verify()`, `witness()`, `approve()`, `reject()`, `markAsCompleted()`, `reopen()`
+- PDF endorsement forms can be generated and downloaded
+
+---
+
+## 7. Frontend Structure
+
+### Layout:
+Every page wraps inside `AppLayout.vue` which provides:
+- **Sidebar** navigation (left) with module links
+- **Navbar** (top) with user info
+- Content area in the middle
+
+### Page organization:
+```
+resources/js/Pages/
+├── Dashboard.vue              ← Home page with stats
+├── AdminDashboard.vue         ← Detailed admin dashboard
+├── Auth/                      ← Login, Register pages
+├── Cattle/                    ← Cattle list, create, detail
+├── Calving/                   ← Calving records
+├── CalvingChecklist/          ← Calving checklists
+├── Mortality/                 ← Mortality cases & PM exam
+├── Health/                    ← Treatment, contacts, codes
+├── Transfer/                  ← CTV, SIV, Receival pages
+├── Pasture/                   ← Pasture management
+├── Feeding/                   ← Feeding records
+├── Inventory/                 ← Feed, medication, stock
+├── HerdCards/                 ← Herd card views
+├── Driver/                    ← Driver management
+├── Task/                      ← Task management
+├── Profile/                   ← User profile
+├── UserManagement.vue         ← Admin user management
+├── AccessControlMatrix.vue    ← Permission configuration
+├── FieldLevelPermissions.vue  ← Field-level access control
+├── AuditLogs.vue              ← Activity tracking
+└── AccessDenied.vue           ← 403 page
+```
+
+### How data flows from backend to frontend:
+```php
+// In a Controller:
+return Inertia::render('Cattle/Index', [
+    'cattle' => $cattle,      // This becomes a Vue prop
+    'filters' => $filters,
+]);
+```
+```vue
+<!-- In the Vue page: -->
+<script setup>
+const props = defineProps({ cattle: Array, filters: Object });
+</script>
+```
+
+---
+
+## 8. Audit Logging
+Every important action is logged in the `audit_logs` table. The Dashboard shows recent activities with:
+- Who did it (user)
+- What module (cattle, mortality, etc.)
+- What action (created, updated, approved, etc.)
+- Details of the change
+
+---
+
+## 9. Key Technical Decisions to Mention
+
+| Decision | Why |
+|----------|-----|
+| **Inertia.js instead of REST API** | Faster development — no need to build separate API endpoints. Controllers directly pass data to Vue components. |
+| **Endorsement workflow as a reusable pattern** | Same approval flow used across 5 modules — reduces code duplication. |
+| **Role-based + Module-based permissions** | Flexible — admins can grant different access levels per user per module. |
+| **Custom fields system** | Allows adding new data fields without modifying the database schema (stored as JSON or in separate custom_fields table). |
+| **MySQL on WAMP** | Simple local development setup, easy to deploy. |
+| **DomPDF + TCPDF** | Generate official documents (LCC certificates, endorsement forms) as downloadable PDFs. |
+| **PhpSpreadsheet** | Export data to Excel for reporting. |
+
+---
+
+## 10. Quick Interview Cheat Sheet
+
+### "What does your system do?"
+> "It's a **Cattle Management System** for livestock estates. It digitizes the entire lifecycle of cattle — from **birth (calving)** to **health treatments**, **transfers between locations**, and **mortality recording**. Every critical record goes through a multi-step **endorsement workflow** where different stakeholders (livestock officers, supervisors, managers, security) must sign off."
+
+### "What tech stack did you use?"
+> "**Laravel 12** backend, **Vue 3** frontend with **Inertia.js** as the bridge, **MySQL** database, styled with **Tailwind CSS**, and built with **Vite**."
+
+### "What's the most complex part?"
+> "The **endorsement workflow system** — it supports multi-step approval (up to 8 steps for transfers), with document upload/download at each step, digital signatures, rejection with reasons, and the ability for admins to reopen completed records."
+
+### "How do you handle permissions?"
+> "Three-layer system: **module-level permissions** (what modules can you access), **field-level permissions** (what fields can you see), and **workflow assignments** (who is assigned to approve at each step). Admins configure everything through an **Access Control Matrix** page."
+
+### "How many modules does it have?"
+> "**11 main modules**: Cattle Management, Calving Records, Calving Checklists, Mortality & Post-Mortem, Health Treatment, Transfer Documents (CTV/SIV/Receival), Pasture & Grazing, Feeding, Inventory, Driver Management, and Task Management — plus admin modules for User Management, Permissions, and Audit Logs."
+
+---
+
+> [!TIP]
+> **Before your interview:** Try running the app locally (`php artisan serve` + `npm run dev`) and click through each module so you can describe the UI confidently. The URL is `http://cattle.local`.

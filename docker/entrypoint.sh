@@ -8,6 +8,10 @@ if [ -z "${APP_KEY:-}" ]; then
   exit 1
 fi
 
+if [ -n "${APP_URL:-}" ]; then
+  export APP_URL=$(echo "$APP_URL" | sed 's|^http://|https://|')
+fi
+
 php artisan config:clear
 php artisan route:clear
 php artisan view:clear
@@ -21,6 +25,8 @@ fi
 if [ "${RUN_SEEDERS:-false}" = "true" ]; then
   php artisan db:seed --force
 fi
+
+php artisan ziggy:generate 2>/dev/null || true
 
 php artisan config:cache
 php artisan route:cache

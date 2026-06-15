@@ -11,10 +11,11 @@ RUN composer install \
     --optimize-autoloader \
     --ignore-platform-req=ext-gd
 
-FROM node:22-slim AS frontend
+
+FROM node:20-slim AS frontend
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm install --legacy-peer-deps
+RUN rm -f package-lock.json && npm install --legacy-peer-deps
 COPY --from=vendor /app/vendor/tightenco/ziggy ./vendor/tightenco/ziggy
 COPY vite.config.js postcss.config.js tailwind.config.js jsconfig.json ./
 COPY resources ./resources

@@ -11,7 +11,7 @@ RUN composer install \
     --optimize-autoloader \
     --ignore-platform-req=ext-gd
 
-FROM node:22-alpine AS frontend
+FROM node:22-slim AS frontend
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm install --legacy-peer-deps

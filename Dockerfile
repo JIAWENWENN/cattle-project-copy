@@ -53,7 +53,9 @@ COPY --from=frontend /app/public/build ./public/build
 
 COPY . .
 
-RUN composer dump-autoload --optimize \
+# Delete any accidentally committed Laravel cache files to force a fresh URL read
+RUN rm -f bootstrap/cache/*.php \
+    && composer dump-autoload --optimize \
     && mkdir -p \
         storage/framework/cache/data \
         storage/framework/sessions \
@@ -61,7 +63,7 @@ RUN composer dump-autoload --optimize \
         storage/logs \
         bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
-
+    
 COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
 COPY docker/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh

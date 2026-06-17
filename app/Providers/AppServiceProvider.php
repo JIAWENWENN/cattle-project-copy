@@ -7,6 +7,7 @@ use App\Observers\GlobalAuditObserver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -27,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Schema::defaultStringLength(191);
+        URL::forceScheme('https');
         Vite::prefetch(concurrency: 3);
         $this->configurePasswordValidation();
         $this->registerGlobalAuditObservers();

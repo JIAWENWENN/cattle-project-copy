@@ -43,10 +43,14 @@ class ValidEmailDomain implements ValidationRule
             }
         }
 
-        $hasMx = @dns_get_record($domain, DNS_MX);
-        $hasA  = @dns_get_record($domain, DNS_A);
-        if (empty($hasMx) && empty($hasA)) {
-            $fail('The :attribute domain does not have a valid mail server.');
+        try {
+            $hasMx = @dns_get_record($domain, DNS_MX);
+            $hasA  = @dns_get_record($domain, DNS_A);
+            if (empty($hasMx) && empty($hasA)) {
+                $fail('The :attribute domain does not have a valid mail server.');
+            }
+        } catch (\Throwable) {
+            // DNS check unavailable — skip validation
         }
     }
 }

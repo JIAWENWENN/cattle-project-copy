@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\CattleController;
 use App\Http\Controllers\WeeklyCattleReturnController;
@@ -29,6 +28,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rules\Password;
 
 // ==========================================
 // PUBLIC ROUTES
@@ -100,13 +100,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:Dashboard')->name('admin.dashboard');
 
     // ==========================================
-    // PROFILE ROUTES
+    // PROFILE PHOTO API
     // ==========================================
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-
-    // Profile Photo Upload
     Route::post('/profile/photo', function (Request $request) {
         $request->validate([
             'photo' => 'required|image|mimes:jpeg,jpg,png,gif,webp,bmp|max:4096'
@@ -221,8 +216,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/users', function (Request $request) {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:8',
+            'email' => ['required', 'email', 'unique:users,email', new \App\Rules\ValidEmailDomain],
+            'password' => ['required', 'confirmed', Password::defaults()],
             'role' => 'required|string',
             'status' => 'required|string'
         ]);
@@ -243,8 +238,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/users/{user}', function (Request $request, \App\Models\User $user) {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $user->id,
-            'password' => 'nullable|min:8',
+            'email' => ['required', 'email', 'unique:users,email,' . $user->id, new \App\Rules\ValidEmailDomain],
+            'password' => ['nullable', Password::defaults()],
             'role' => 'required|string',
             'status' => 'required|string'
         ]);

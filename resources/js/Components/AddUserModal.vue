@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import { X, Plus, Edit3, Trash2 } from 'lucide-vue-next';
+import PasswordStrengthMeter from '@/Components/PasswordStrengthMeter.vue';
 
 const props = defineProps({
     show: Boolean,
@@ -15,6 +16,7 @@ const form = useForm({
     name: '',
     email: '',
     password: '',
+    password_confirmation: '',
     role: 'Admin',
     status: 'active'
 });
@@ -174,7 +176,7 @@ const submit = () => {
         console.log('Updating user ID:', props.editingUser.id);
         form.put(route('users.update', props.editingUser.id), {
             onSuccess: () => {
-                form.reset();
+                form.reset('password', 'password_confirmation');
                 cancelCustomMode();
                 emit('close');
             },
@@ -187,7 +189,7 @@ const submit = () => {
         console.log('Creating new user');
         form.post(route('users.store'), {
             onSuccess: () => {
-                form.reset();
+                form.reset('password', 'password_confirmation');
                 cancelCustomMode();
                 emit('close');
             },
@@ -199,7 +201,7 @@ const submit = () => {
 };
 
 const close = () => {
-    form.reset();
+    form.reset('password', 'password_confirmation');
     cancelCustomMode();
     emit('close');
 };
@@ -264,7 +266,21 @@ const close = () => {
                             <p class="text-xs text-gray-500 mt-1">
                                 {{ isEditing ? 'Leave blank to keep current password' : 'Must be at least 8 characters long' }}
                             </p>
+                            <PasswordStrengthMeter :password="form.password" />
                             <div v-if="form.errors.password" class="text-red-600 text-xs mt-1">{{ form.errors.password }}</div>
+                        </div>
+
+                        <!-- Confirm Password -->
+                        <div v-if="!isEditing">
+                            <label class="block text-sm font-medium text-gray-900 mb-2">Confirm Password</label>
+                            <input
+                                v-model="form.password_confirmation"
+                                type="password"
+                                placeholder="Re-enter the password"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2F4F4F] focus:border-transparent text-sm"
+                                required
+                            />
+                            <div v-if="form.errors.password_confirmation" class="text-red-600 text-xs mt-1">{{ form.errors.password_confirmation }}</div>
                         </div>
 
                         <!-- Role & Status -->

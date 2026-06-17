@@ -27,7 +27,7 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            'email' => ['required', 'string', 'email', new \App\Rules\ValidEmailDomain],
             'password' => ['required', 'string'],
         ];
     }
@@ -46,6 +46,16 @@ class LoginRequest extends FormRequest
 
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
+            ])->redirectTo(route('login'));
+        }
+
+        $user = Auth::user();
+
+        if (strtolower($user->status) === 'inactive') {
+            Auth::logout();
+
+            throw ValidationException::withMessages([
+                'email' => 'Your account is inactive. Please contact the administrator.',
             ])->redirectTo(route('login'));
         }
 

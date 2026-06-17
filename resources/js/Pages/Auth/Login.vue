@@ -1,5 +1,5 @@
 <script setup>
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 import { onMounted } from 'vue';
 
 defineProps({
@@ -92,17 +92,25 @@ const submit = () => {
                         />
                     </div>
 
-                    <!-- Remember Me Checkbox ← ADD THIS -->
-                    <div class="flex items-center">
-                        <input
-                            id="remember"
-                            v-model="form.remember"
-                            type="checkbox"
-                            class="w-4 h-4 text-[#34554a] bg-gray-100 border-gray-300 rounded focus:ring-[#34554a] focus:ring-2"
-                        />
-                        <label for="remember" class="ml-2 text-xs text-gray-700 cursor-pointer">
-                            Remember me
-                        </label>
+                    <!-- Remember Me & Forgot Password -->
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <input
+                                id="remember"
+                                v-model="form.remember"
+                                type="checkbox"
+                                class="w-4 h-4 text-[#34554a] bg-gray-100 border-gray-300 rounded focus:ring-[#34554a] focus:ring-2"
+                            />
+                            <label for="remember" class="ml-2 text-xs text-gray-700 cursor-pointer">
+                                Remember me
+                            </label>
+                        </div>
+                        <Link
+                            :href="route('password.request')"
+                            class="text-xs text-[#34554a] hover:text-[#2c463d] font-medium underline underline-offset-2"
+                        >
+                            Forgot Password?
+                        </Link>
                     </div>
 
                     <!-- Submit Button -->

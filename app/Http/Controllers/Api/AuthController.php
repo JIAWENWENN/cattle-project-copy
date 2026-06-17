@@ -12,12 +12,22 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'email' => 'required|email',
+            'email' => ['required', 'email', new \App\Rules\ValidEmailDomain],
             'password' => 'required'
         ]);
 
         if (Auth::attempt($credentials)) {
             $user = Auth::user();
+
+            if (strtolower($user->status) === 'inactive') {
+                Auth::logout();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Your account is inactive. Please contact the administrator.'
+                ], 403);
+            }
+
             return response()->json([
                 'success' => true,
                 'user' => [

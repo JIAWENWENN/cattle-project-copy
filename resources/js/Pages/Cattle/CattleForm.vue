@@ -326,10 +326,11 @@ const submit = () => {
 
                 <!-- Coat Colour with Add New -->
                 <div class="flex flex-col space-y-1">
-                    <label class="text-sm font-medium text-gray-700">Coat Colour</label>
+                    <label class="text-sm font-medium text-gray-700">Coat Colour <span class="text-red-500">*</span></label>
                     <div class="flex gap-2">
                         <select
                             v-model="form.coat_colour"
+                            required
                             class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:ring-green-500 focus:border-green-500">
                             <option value="">Select...</option>
                             <option v-for="opt in getFieldOptions('coat_colour')" :key="opt.id" :value="opt.value">{{ opt.value }}</option>

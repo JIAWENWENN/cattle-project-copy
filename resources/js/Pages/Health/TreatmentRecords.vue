@@ -657,7 +657,7 @@ const openEditModal = (record) => {
     
     let unitName = record.operating_unit || '';
     if (matchedCattle) {
-        let herdName = matchedCattle.herd || '';
+        let herdName = matchedCattle.operating_unit || '';
         if (!herdName && matchedCattle.location_block) {
             const unit = page.props.estates?.find(u => 
                 (u.pasture_blocks || u.pastureBlocks || u.blocks || []).some(b => b.name === matchedCattle.location_block)
@@ -735,7 +735,7 @@ const onEditCattleChange = () => {
         editForm.colour = selectedCattle.coat_colour || '';
         
         let unitName = editForm.operating_unit || '';
-        let herdName = selectedCattle.herd || '';
+        let herdName = selectedCattle.operating_unit || '';
         if (!herdName && selectedCattle.location_block) {
             const unit = page.props.estates?.find(u => 
                 (u.pasture_blocks || u.pastureBlocks || u.blocks || []).some(b => b.name === selectedCattle.location_block)

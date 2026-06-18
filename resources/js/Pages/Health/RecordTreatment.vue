@@ -53,7 +53,7 @@ if (props.treatment) {
     const tCattle = cattle.find(c => c.id == props.treatment.cattle_id);
     let unitName = props.treatment.operating_unit || '';
     if (tCattle) {
-        let herdName = tCattle.herd || '';
+        let herdName = tCattle.operating_unit || '';
         if (!herdName && tCattle.location_block) {
             const unit = estates.find(u => 
                 (u.pasture_blocks || u.blocks || []).some(b => b.name === tCattle.location_block)
@@ -94,13 +94,13 @@ const operatingUnitOptions = computed(() => {
         .filter(Boolean);
 
     const cattleUnits = cattle
-        .map((item) => (item?.herd || '').trim())
+        .map((item) => (item?.operating_unit || '').trim())
         .filter(Boolean);
 
     const selectedUnits = [
         (form.value.operating_unit || '').trim(),
         (props.treatment?.operating_unit || '').trim(),
-        (props.treatment?.cattle?.herd || '').trim(),
+        (props.treatment?.cattle?.operating_unit || '').trim(),
     ].filter(Boolean);
 
     return [...new Set([...estateNames, ...cattleUnits, ...selectedUnits])];
@@ -127,7 +127,7 @@ const onCattleChange = () => {
         form.value.category = selectedCattle.category || '';
         form.value.colour = selectedCattle.coat_colour || '';
         
-        let unitName = selectedCattle.herd || '';
+        let unitName = selectedCattle.operating_unit || '';
         if (!unitName && selectedCattle.location_block) {
             const unit = estates.find(u => 
                 (u.pasture_blocks || u.pastureBlocks || u.blocks || []).some(b => b.name === selectedCattle.location_block)

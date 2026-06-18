@@ -233,18 +233,18 @@ const formatActivityDay = (date) => {
 // Helper functions
 const formatDate = (date) => {
     if (!date) return '-';
-    return new Date(date).toLocaleDateString('en-MY', { 
-        day: '2-digit', 
-        month: 'short', 
-        year: 'numeric' 
+    return new Date(date).toLocaleDateString('en-MY', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
     });
 };
 
 const formatTime = (date) => {
     if (!date) return '-';
-    return new Date(date).toLocaleTimeString('en-MY', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
+    return new Date(date).toLocaleTimeString('en-MY', {
+        hour: '2-digit',
+        minute: '2-digit'
     });
 };
 

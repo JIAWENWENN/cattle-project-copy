@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\CattleController;
 use App\Http\Controllers\WeeklyCattleReturnController;
 use App\Http\Controllers\DataInputController;
@@ -56,28 +55,6 @@ Route::post('/test-upload', function (Request $request) {
         'php_files' => $_FILES,
         'content_type' => $request->header('Content-Type'),
     ]);
-});
-
-// ==========================================
-// AUTHENTICATION ROUTES
-// ==========================================
-
-// Login routes
-Route::get('/login', [AuthenticatedSessionController::class, 'create'])
-    ->middleware('guest')
-    ->name('login');
-
-Route::post('/login', [AuthenticatedSessionController::class, 'store'])
-    ->middleware('guest');
-
-// Logout route
-Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
-    ->middleware('auth')
-    ->name('logout');
-
-// Fallback for accidental GET /logout requests
-Route::get('/logout', function () {
-    return redirect('/login');
 });
 
 // ==========================================

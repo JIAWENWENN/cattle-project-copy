@@ -26,7 +26,13 @@ services:
       - key: APP_KEY
         generateValue: true
       - key: APP_URL
-        sync: false
+        value: https://cattle-project-sg.onrender.com
+      - key: MAIL_MAILER
+        value: log
+      - key: MAIL_FROM_ADDRESS
+        value: noreply@cattle-project-sg.onrender.com
+      - key: MAIL_FROM_NAME
+        value: Cattle System
       - key: LOG_CHANNEL
         value: stderr
       - key: LOG_LEVEL

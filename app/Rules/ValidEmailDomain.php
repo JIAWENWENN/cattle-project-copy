@@ -43,6 +43,10 @@ class ValidEmailDomain implements ValidationRule
             }
         }
 
+        if (app()->environment('production')) {
+            return;
+        }
+
         try {
             $hasMx = @dns_get_record($domain, DNS_MX);
             $hasA  = @dns_get_record($domain, DNS_A);

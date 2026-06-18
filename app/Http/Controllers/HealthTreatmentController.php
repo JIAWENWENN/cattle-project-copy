@@ -32,6 +32,25 @@ class HealthTreatmentController extends Controller
         ['role' => 'livestock manager', 'field' => 'approved', 'label' => 'Approved By', 'role_name' => 'Livestock Manager/OIC'],
     ];
 
+    private function resolveOperatingUnits($cattle, $estates)
+    {
+        $blockToEstate = [];
+        foreach ($estates as $estate) {
+            foreach ($estate->pastureBlocks ?? [] as $block) {
+                $blockToEstate[$block->name] = $estate->name;
+            }
+        }
+
+        return $cattle->map(function ($c) use ($blockToEstate) {
+            $unit = trim((string) ($c->operating_unit ?? ''));
+            if ($unit === '' && !empty($c->location_block)) {
+                $unit = $blockToEstate[$c->location_block] ?? $c->location_block;
+            }
+            $c->operating_unit = $unit;
+            return $c;
+        });
+    }
+
     /**
      * Display a listing of treatment records
      */
@@ -49,7 +68,8 @@ class HealthTreatmentController extends Controller
             ->values();
 
         $estates = Estate::with('pastureBlocks')->where('is_active', true)->orderBy('name')->get();
-        $cattle = Cattle::where('status', 'Active')->get(['id', 'tag_no', 'category', 'coat_colour', 'location_block', 'location_phase']);
+        $cattle = Cattle::where('status', 'Active')->get(['id', 'tag_no', 'category', 'coat_colour', 'location_block', 'location_phase', 'operating_unit']);
+        $cattle = $this->resolveOperatingUnits($cattle, $estates);
         $treatmentCodes = \App\Models\TreatmentCode::active()->orderBy('label')->get();
         $monthlyWorkflows = TreatmentMonthlyWorkflow::query()
             ->select(['year', 'month', 'operating_unit', 'status', 'is_completed'])
@@ -91,9 +111,11 @@ class HealthTreatmentController extends Controller
      */
     public function create()
     {
-        $cattle = Cattle::where('status', 'Active')->get(['id', 'tag_no', 'category', 'coat_colour', 'location_block', 'location_phase']);
-        $treatmentCodes = \App\Models\TreatmentCode::active()->orderBy('label')->get();
         $estates = Estate::with('pastureBlocks')->where('is_active', true)->orderBy('name')->get();
+
+        $cattle = Cattle::where('status', 'Active')->get(['id', 'tag_no', 'category', 'coat_colour', 'location_block', 'location_phase', 'operating_unit']);
+        $cattle = $this->resolveOperatingUnits($cattle, $estates);
+        $treatmentCodes = \App\Models\TreatmentCode::active()->orderBy('label')->get();
 
         return Inertia::render('Health/RecordTreatment', [
             'cattle' => $cattle,
@@ -108,9 +130,11 @@ class HealthTreatmentController extends Controller
     public function edit($id)
     {
         $treatment = Treatment::with('cattle')->findOrFail($id);
-        $cattle = Cattle::where('status', 'Active')->get(['id', 'tag_no', 'category', 'coat_colour', 'location_block', 'location_phase']);
-        $treatmentCodes = \App\Models\TreatmentCode::active()->orderBy('label')->get();
         $estates = Estate::with('pastureBlocks')->where('is_active', true)->orderBy('name')->get();
+
+        $cattle = Cattle::where('status', 'Active')->get(['id', 'tag_no', 'category', 'coat_colour', 'location_block', 'location_phase', 'operating_unit']);
+        $cattle = $this->resolveOperatingUnits($cattle, $estates);
+        $treatmentCodes = \App\Models\TreatmentCode::active()->orderBy('label')->get();
 
         return Inertia::render('Health/RecordTreatment', [
             'cattle' => $cattle,

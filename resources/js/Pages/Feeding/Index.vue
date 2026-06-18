@@ -834,17 +834,12 @@ const fmt = (v) => {
                             </div>
                         </div>
 
-                        <!-- Row 4: Receive + Carry Forward + Balance -->
-                        <div class="grid grid-cols-3 gap-4">
+                        <!-- Row 4: Receive + Balance -->
+                        <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wider">Receive (kg)</label>
                                 <input v-model.number="form.receive" type="number" min="0" step="0.01"
                                     class="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm focus:ring-2 focus:ring-[#34554a] outline-none" />
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-600 mb-1.5 tracking-wider">Carry Forward (kg)</label>
-                                <input v-model.number="form.carry_forward" type="number" min="0" step="0.01" disabled
-                                    class="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-100 text-sm text-gray-500 outline-none" />
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-600 mb-1.5 tracking-wider">Balance (kg)</label>

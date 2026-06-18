@@ -596,6 +596,64 @@ class WeeklyCattleReturnController extends Controller
     {
         $opening = $this->emptyBucket();
 
+        $allCattle = Cattle::query()
+            ->get(['id', 'tag_no', 'category', 'birth_date', 'created_at', 'status']);
+
+        if ($allCattle->isEmpty()) {
+            return $opening;
+        }
+
+        $tagNos = $allCattle->pluck('tag_no')
+            ->map(fn ($t) => trim((string) $t))
+            ->filter()
+            ->values()
+            ->all();
+
+        if (empty($tagNos)) {
+            return $opening;
+        }
+
+        $allCtvs = TransferDocument::query()
+            ->where('type', TransferDocument::TYPE_CTV)
+            ->where('status', TransferDocument::STATUS_COMPLETED)
+            ->whereHas('livestock', function ($q) use ($tagNos) {
+                $q->whereIn('tag_no', $tagNos);
+            })
+            ->with('livestock:transfer_document_id,tag_no')
+            ->orderBy('updated_at')
+            ->orderBy('id')
+            ->get(['id', 'to_location', 'cattle_location_snapshot', 'updated_at']);
+
+        $asOfEnd = $asOf->copy()->endOfDay();
+
+        $operatingUnitAtDate = [];
+        $originalLocation = [];
+
+        foreach ($allCtvs as $ctv) {
+            $ctvTime = $ctv->updated_at;
+            $toLocation = trim((string) $ctv->to_location);
+            $snapshot = $ctv->cattle_location_snapshot ?? [];
+
+            foreach ($ctv->livestock as $livestock) {
+                $tag = trim((string) $livestock->tag_no);
+                if ($tag === '') {
+                    continue;
+                }
+
+                if (!isset($originalLocation[$tag])) {
+                    $originalLocation[$tag] = isset($snapshot[$tag]['operating_unit'])
+                        ? trim((string) $snapshot[$tag]['operating_unit'])
+                        : null;
+                }
+
+                if ($ctvTime <= $asOfEnd) {
+                    $operatingUnitAtDate[$tag] = $toLocation;
+                } elseif (!isset($operatingUnitAtDate[$tag])) {
+                    $operatingUnitAtDate[$tag] = $originalLocation[$tag];
+                }
+            }
+        }
+
         $deceasedBefore = MortalityCase::query()
             ->whereNotNull('cattle_id')
             ->where('status', 'completed')
@@ -605,16 +663,19 @@ class WeeklyCattleReturnController extends Controller
             ->flip()
             ->all();
 
-        $cattle = Cattle::query()
-            ->where('operating_unit', $unitName)
-            ->get(['id', 'tag_no', 'category', 'birth_date', 'created_at', 'status']);
+        foreach ($allCattle as $animal) {
+            $tag = trim((string) $animal->tag_no);
+            $unit = $operatingUnitAtDate[$tag] ?? trim((string) $animal->operating_unit);
 
-        foreach ($cattle as $animal) {
+            if ($unit !== $unitName) {
+                continue;
+            }
+
             $eventDate = $animal->birth_date
                 ? Carbon::parse($animal->birth_date)->endOfDay()
                 : Carbon::parse($animal->created_at)->endOfDay();
 
-            if ($eventDate->greaterThan($asOf->copy()->endOfDay())) {
+            if ($eventDate->greaterThan($asOfEnd)) {
                 continue;
             }
 

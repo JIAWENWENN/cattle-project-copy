@@ -536,7 +536,7 @@ class WeeklyCattleReturnController extends Controller
                 $sale = $stats['sale'][$code] ?? 0;
                 $transferIn = $stats['transfer_in'][$code] ?? 0;
                 $transferOut = $stats['transfer_out'][$code] ?? 0;
-                $closing[$code] = $opening + $calving - $mortality - $sale + $transferIn - $transferOut;
+                $closing[$code] = max(0, $opening + $calving - $mortality - $sale + $transferIn - $transferOut);
             }
 
             $row = [

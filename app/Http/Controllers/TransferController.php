@@ -646,7 +646,7 @@ class TransferController extends Controller
         return $results;
     }
 
-    private function validateLivestockTagsMatchFromLocation(string $fromLocation, array $livestockRows): void
+    private function validateLivestockTagsMatchFromLocation(string $fromLocation, array $livestockRows, ?string $documentType = null): void
     {
         $from = trim($fromLocation);
         if ($from === '' || empty($livestockRows)) {
@@ -659,10 +659,15 @@ class TransferController extends Controller
         }
 
         $tagNos = [];
+        $requestedByCategory = [];
         foreach ($livestockRows as $row) {
             $tag = trim((string) ($row['tag_no'] ?? ''));
             if ($tag !== '') {
                 $tagNos[] = $tag;
+                $cat = trim((string) ($row['category'] ?? ''));
+                if ($cat !== '') {
+                    $requestedByCategory[$cat] = ($requestedByCategory[$cat] ?? 0) + 1;
+                }
             }
         }
         $tagNos = array_values(array_unique($tagNos));
@@ -673,7 +678,7 @@ class TransferController extends Controller
         $cattleByTag = Cattle::query()
             ->where('status', 'Active')
             ->whereIn('tag_no', $tagNos)
-            ->get(['tag_no', 'operating_unit'])
+            ->get(['tag_no', 'operating_unit', 'category'])
             ->keyBy('tag_no');
 
         $errors = [];
@@ -691,6 +696,24 @@ class TransferController extends Controller
 
             if (trim((string) ($cattle->operating_unit ?? '')) !== $from) {
                 $errors["livestock.$idx.tag_no"] = "Tag no. {$tag} is not in the selected From location ({$from}).";
+            }
+        }
+
+        // For outgoing transfers (CTV or SIV), check category counts at from_location
+        if (empty($errors) && $documentType && in_array($documentType, [TransferDocument::TYPE_CTV, TransferDocument::TYPE_SIV], true)) {
+            $availableByCategory = Cattle::query()
+                ->where('status', 'Active')
+                ->where('operating_unit', $from)
+                ->selectRaw('category, COUNT(*) as count')
+                ->groupBy('category')
+                ->pluck('count', 'category')
+                ->toArray();
+
+            foreach ($requestedByCategory as $cat => $requestedCount) {
+                $available = $availableByCategory[$cat] ?? 0;
+                if ($requestedCount > $available) {
+                    $errors['livestock'] = "Cannot transfer {$requestedCount} {$cat} from {$from}. Only {$available} active {$cat} available at this location.";
+                }
             }
         }
 
@@ -940,7 +963,8 @@ private function typeHistory(Request $request, string $type, string $component)
 
         $this->validateLivestockTagsMatchFromLocation(
             (string) ($validated['from_location'] ?? ''),
-            (array) ($validated['livestock'] ?? [])
+            (array) ($validated['livestock'] ?? []),
+            $validated['type'] ?? null
         );
 
         $module = $this->getPermissionModuleForType($validated['type']);
@@ -1179,7 +1203,8 @@ private function typeHistory(Request $request, string $type, string $component)
 
         $this->validateLivestockTagsMatchFromLocation(
             (string) ($validated['from_location'] ?? ''),
-            (array) ($validated['livestock'] ?? [])
+            (array) ($validated['livestock'] ?? []),
+            TransferDocument::TYPE_CTV
         );
 
         DB::transaction(function () use ($document, $validated) {
@@ -1263,7 +1288,8 @@ private function typeHistory(Request $request, string $type, string $component)
 
         $this->validateLivestockTagsMatchFromLocation(
             (string) ($validated['from_location'] ?? ''),
-            (array) ($validated['livestock'] ?? [])
+            (array) ($validated['livestock'] ?? []),
+            TransferDocument::TYPE_SIV
         );
 
         DB::transaction(function () use ($document, $validated) {
@@ -1362,7 +1388,8 @@ private function typeHistory(Request $request, string $type, string $component)
 
         $this->validateLivestockTagsMatchFromLocation(
             (string) ($validated['from_location'] ?? ''),
-            (array) ($validated['livestock'] ?? [])
+            (array) ($validated['livestock'] ?? []),
+            TransferDocument::TYPE_RECEIVAL
         );
 
         DB::transaction(function () use ($document, $validated) {

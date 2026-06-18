@@ -129,9 +129,19 @@ class TransferDocument extends Model
     {
         $prefix = $this->type;
         $year = date('Y');
-        $count = self::where('type', $this->type)
+
+        $last = self::withTrashed()
+            ->where('type', $this->type)
             ->whereYear('created_at', $year)
-            ->count() + 1;
+            ->orderBy('id', 'desc')
+            ->value('document_no');
+
+        if ($last && preg_match('/^' . preg_quote($prefix, '/') . '-' . preg_quote($year, '/') . '-(\d+)$/', $last, $m)) {
+            $count = (int) $m[1] + 1;
+        } else {
+            $count = 1;
+        }
+
         $this->document_no = sprintf('%s-%s-%04d', $prefix, $year, $count);
     }
 

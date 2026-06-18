@@ -559,8 +559,8 @@ const toggleCodeActive = async (code) => {
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-500 mb-1">Cattle id</label>
-                        <input :value="form.cattle_id || 'Not selected'" type="text" readonly class="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-sm outline-none text-gray-600">
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Cattle tag</label>
+                        <input :value="form.tag_no || 'Not selected'" type="text" readonly class="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-sm outline-none text-gray-600">
                     </div>
 <div>
                         <label class="block text-xs font-semibold text-gray-500 mb-1">Tag number</label>

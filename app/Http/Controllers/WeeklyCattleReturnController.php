@@ -606,10 +606,7 @@ class WeeklyCattleReturnController extends Controller
             ->all();
 
         $cattle = Cattle::query()
-            ->where(function ($query) use ($unitName) {
-                $query->where('location_block', $unitName)
-                    ->orWhere('operating_unit', $unitName);
-            })
+            ->where('operating_unit', $unitName)
             ->get(['id', 'tag_no', 'category', 'birth_date', 'created_at', 'status']);
 
         foreach ($cattle as $animal) {

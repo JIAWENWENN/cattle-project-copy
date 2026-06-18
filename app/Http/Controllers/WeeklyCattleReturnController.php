@@ -680,7 +680,7 @@ class WeeklyCattleReturnController extends Controller
         $saleDocs = TransferDocument::query()
             ->where('type', TransferDocument::TYPE_SIV)
             ->where('status', TransferDocument::STATUS_COMPLETED)
-            ->whereBetween('date', [$dateFrom->toDateString(), $dateTo->toDateString()])
+            ->whereBetween('updated_at', [$dateFrom, $dateTo])
             ->whereIn('from_location', $unitsToProcess)
             ->with('livestock:id,transfer_document_id,category,tag_no')
             ->get(['id', 'from_location']);
@@ -739,7 +739,7 @@ class WeeklyCattleReturnController extends Controller
         $transferDocs = TransferDocument::query()
             ->where('type', TransferDocument::TYPE_CTV)
             ->where('status', TransferDocument::STATUS_COMPLETED)
-            ->whereBetween('date', [$dateFrom->toDateString(), $dateTo->toDateString()])
+            ->whereBetween('updated_at', [$dateFrom, $dateTo])
             ->where(function ($query) use ($unitsToProcess) {
                 $query->whereIn('from_location', $unitsToProcess)
                     ->orWhereIn('to_location', $unitsToProcess);

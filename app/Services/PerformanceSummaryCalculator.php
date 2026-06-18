@@ -326,7 +326,7 @@ class PerformanceSummaryCalculator
         $docs = TransferDocument::query()
             ->where('type', TransferDocument::TYPE_SIV)
             ->where('status', TransferDocument::STATUS_COMPLETED)
-            ->whereBetween('date', [$dateFrom->toDateString(), $dateTo->toDateString()])
+            ->whereBetween('updated_at', [$dateFrom, $dateTo])
             ->where('from_location', $herd)
             ->with('livestock:id,transfer_document_id,category,tag_no')
             ->get();
@@ -381,7 +381,7 @@ class PerformanceSummaryCalculator
         $docs = TransferDocument::query()
             ->where('type', TransferDocument::TYPE_CTV)
             ->where('status', TransferDocument::STATUS_COMPLETED)
-            ->whereBetween('date', [$dateFrom->toDateString(), $dateTo->toDateString()])
+            ->whereBetween('updated_at', [$dateFrom, $dateTo])
             ->where(function ($query) use ($normalizedHerd) {
                 $query->whereRaw('UPPER(TRIM(from_location)) = ?', [$normalizedHerd])
                     ->orWhereRaw('UPPER(TRIM(to_location)) = ?', [$normalizedHerd]);
@@ -417,7 +417,7 @@ class PerformanceSummaryCalculator
         $receivalDocs = TransferDocument::query()
             ->where('type', TransferDocument::TYPE_RECEIVAL)
             ->where('status', TransferDocument::STATUS_COMPLETED)
-            ->whereBetween('date', [$dateFrom->toDateString(), $dateTo->toDateString()])
+            ->whereBetween('updated_at', [$dateFrom, $dateTo])
             ->where('to_location', $herd)
             ->with('livestock:id,transfer_document_id,category,tag_no')
             ->get();

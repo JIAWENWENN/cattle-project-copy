@@ -1019,7 +1019,6 @@ const detailFieldConfig = [
     { key: 'operating_unit', label: 'Operating Unit' },
     { key: 'colour', label: 'Coat Colour' },
     { key: 'date', label: 'Date', type: 'date' },
-    { key: 'week', label: 'Week' },
     { key: 'symptoms', label: 'Symptoms' },
     { key: 'treatment', label: 'Treatment' },
     { key: 'treatment_code', label: 'Treatment Code' },
@@ -1027,9 +1026,7 @@ const detailFieldConfig = [
     { key: 'remarks', label: 'Remarks' },
     { key: 'follow_up_required', label: 'Follow Up Required', type: 'boolean' },
     { key: 'follow_up_date', label: 'Follow Up Date', type: 'date' },
-    { key: 'follow_up_done', label: 'Follow Up Done', type: 'boolean' },
     { key: 'status', label: 'Status', type: 'status', always: true },
-    { key: 'rejection_reason', label: 'Rejection Reason' },
 ];
 
 const hasFilledValue = (value, field) => {

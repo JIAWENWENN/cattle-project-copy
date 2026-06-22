@@ -38,10 +38,6 @@ class Cattle extends Model
         'sire_category',
         'sire_coat_colour',
 
-        // Milestones
-        'weaning_weight',
-        'yearling_weight',
-
         // Additional
         'status',
         'remarks',
@@ -51,9 +47,7 @@ class Cattle extends Model
     protected $casts = [
         'birth_date' => 'date',
         'receival_weight' => 'decimal:2',
-        'weight' => 'decimal:2',
-        'weaning_weight' => 'decimal:2',
-        'yearling_weight' => 'decimal:2'
+        'weight' => 'decimal:2'
     ];
 
     public function setCoatColourAttribute($value): void
@@ -70,10 +64,5 @@ class Cattle extends Model
     public function movements()
     {
         return $this->hasMany(TransferLivestock::class, 'tag_no', 'tag_no');
-    }
-
-    public function breedingRecords()
-    {
-        return $this->hasMany(CattleBreedingRecord::class);
     }
 }

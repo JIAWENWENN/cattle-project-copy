@@ -82,6 +82,17 @@ class PerformanceSummaryController extends Controller
 
         $opening = $this->calculator->sumBuckets(...$openingBuckets);
         $movements = $this->calculator->sumStatsSets(...$movementSets);
+
+        if (array_sum($opening) === 0) {
+            foreach (PerformanceSummaryCalculator::CATEGORY_CODES as $code) {
+                $sale = (int) ($movements['sale'][$code] ?? 0);
+                $transferOut = (int) ($movements['transfer_out'][$code] ?? 0);
+                if ($sale > 0 || $transferOut > 0) {
+                    $opening[$code] = $sale + $transferOut;
+                }
+            }
+        }
+
         $closing = $this->calculator->computeClosing($opening, $movements);
         $physicalCount = $this->calculator->physicalCountForHerd($operatingUnitName, $month, $year, $operatingUnitName);
 
@@ -92,6 +103,17 @@ class PerformanceSummaryController extends Controller
     {
         $opening = $this->calculator->computeOpeningBalance($herdName, $dateFrom);
         $movements = $this->calculator->buildMovementsForHerd($herdName, $dateFrom, $dateTo, $operatingUnitName);
+
+        if (array_sum($opening) === 0) {
+            foreach (PerformanceSummaryCalculator::CATEGORY_CODES as $code) {
+                $sale = (int) ($movements['sale'][$code] ?? 0);
+                $transferOut = (int) ($movements['transfer_out'][$code] ?? 0);
+                if ($sale > 0 || $transferOut > 0) {
+                    $opening[$code] = $sale + $transferOut;
+                }
+            }
+        }
+
         $closing = $this->calculator->computeClosing($opening, $movements);
         $ouName = $this->resolveOperatingUnitForHerd($herdName) ?? $operatingUnitName;
         $physicalCount = $this->calculator->physicalCountForHerd($herdName, $month, $year, $ouName);

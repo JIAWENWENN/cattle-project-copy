@@ -170,6 +170,14 @@ const totalWeight = computed(() => form.livestock.reduce((sum, item) => sum + (N
 const totalValue = computed(() => form.livestock.reduce((sum, item) => sum + (Number(item.value) || 0), 0).toFixed(2));
 
 const submitForm = () => {
+    if (!form.from_location) {
+        alert('Transfer from is required. Please select a location.');
+        return;
+    }
+    if (!form.to_location) {
+        alert('Transfer to is required. Please select a destination.');
+        return;
+    }
     const tagNos = form.livestock.map(item => item.tag_no?.trim()).filter(Boolean);
     const duplicates = tagNos.filter((tag, idx) => tagNos.indexOf(tag) !== idx);
     if (duplicates.length > 0) {
@@ -245,8 +253,8 @@ const goBack = () => {
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-500 mb-1">Transfer to</label>
-                        <select v-model="form.to_location" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-[#34554a]">
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Transfer to *</label>
+                        <select v-model="form.to_location" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-[#34554a]" required>
                             <option value="">Select destination</option>
                             <option v-for="estate in $page.props.estates" :key="estate.id" :value="estate.name">{{ estate.name }}</option>
                         </select>

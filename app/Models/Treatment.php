@@ -17,7 +17,6 @@ class Treatment extends Model
         'operating_unit',
         'colour',
         'date',
-        'week',
         'symptoms',
         'treatment',
         'treatment_code',
@@ -25,22 +24,16 @@ class Treatment extends Model
         'remarks',
         'follow_up_required',
         'follow_up_date',
-        'follow_up_done',
         'status',
         'current_step',
-        'endorsement_documents',
-        'endorsement_step',
         'is_reopened',
         'created_by',
-        'rejection_reason',
     ];
 
     protected $casts = [
         'date' => 'date',
         'follow_up_date' => 'date',
         'follow_up_required' => 'boolean',
-        'follow_up_done' => 'boolean',
-        'endorsement_documents' => 'object',
         'is_reopened' => 'boolean',
     ];
 
@@ -69,24 +62,6 @@ class Treatment extends Model
             'approved' => 'Approved',
         ];
         return $labels[$this->current_step] ?? $this->current_step;
-    }
-
-    public function scopePendingApprovals($query, $role)
-    {
-        $roleSteps = [
-            'livestock' => 0,   // Prepared by
-            'supervisor' => 1,  // Checked by
-            'manager' => 2,     // Approved by
-        ];
-
-        $requiredStep = $roleSteps[$role] ?? null;
-
-        if ($requiredStep !== null) {
-            return $query->where('endorsement_step', $requiredStep)
-                        ->whereIn('status', ['pending', 'under_review']);
-        }
-
-        return $query->where('status', 'pending');
     }
 
     public function scopeWithDetails($query)

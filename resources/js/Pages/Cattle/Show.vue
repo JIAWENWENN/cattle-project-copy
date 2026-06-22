@@ -99,8 +99,6 @@ const form = useForm({
     sire_tag: props.cattle.sire_tag || '',
     sire_category: props.cattle.sire_category || '',
     sire_coat_colour: props.cattle.sire_coat_colour || '',
-    weaning_weight: props.cattle.weaning_weight || '',
-    yearling_weight: props.cattle.yearling_weight || '',
     status: props.cattle.status || 'Active',
     remarks: props.cattle.remarks || '',
     profile_picture: null

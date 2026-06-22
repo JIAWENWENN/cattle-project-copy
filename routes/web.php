@@ -909,21 +909,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/treatment/{id}', [HealthTreatmentController::class, 'destroy'])->middleware('permission:Treatment Record,delete')->whereNumber('id')->name('treatment.destroy');
         Route::post('/treatment/bulk-delete', [HealthTreatmentController::class, 'bulkDelete'])->middleware('permission:Treatment Record,delete')->name('treatment.bulk-delete');
 
-        // Treatment Endorsement Routes
-        Route::post('/treatment/{id}/upload-endorsement', [HealthTreatmentController::class, 'uploadEndorsement'])->middleware('permission:Treatment Record,edit')->whereNumber('id')->name('treatment.upload-endorsement');
-        Route::delete('/treatment/{id}/endorsement/{stepIndex}', [HealthTreatmentController::class, 'deleteEndorsement'])->middleware('permission:Treatment Record,edit')->whereNumber('id')->name('treatment.delete-endorsement');
-        Route::get('/treatment/{id}/download-endorsement/{stepIndex}', [HealthTreatmentController::class, 'downloadEndorsement'])->middleware('permission:Treatment Record,view')->whereNumber('id')->name('treatment.download-endorsement');
-        Route::get('/treatment/{id}/endorsement-form', [HealthTreatmentController::class, 'downloadEndorsementForm'])->middleware('permission:Treatment Record,view')->whereNumber('id')->name('treatment.endorsement-form');
-        Route::post('/treatment/{id}/mark-completed', [HealthTreatmentController::class, 'markAsCompleted'])->middleware('permission:Treatment Record,edit')->whereNumber('id')->name('treatment.mark-completed');
-        Route::post('/treatment/{id}/reopen', [HealthTreatmentController::class, 'reopen'])->middleware('permission:Treatment Record,edit')->whereNumber('id')->name('treatment.reopen');
-
         // Treatment Monthly Workflow Routes (month/year/unit based)
         Route::get('/treatment/monthly-workflow', [HealthTreatmentController::class, 'getMonthlyWorkflow'])->middleware('permission:Treatment Record,view')->name('treatment.monthly-workflow.get');
-        Route::post('/treatment/monthly-workflow/upload', [HealthTreatmentController::class, 'uploadMonthlyEndorsement'])->middleware('permission:Treatment Record,edit')->name('treatment.monthly-workflow.upload');
+        Route::post('/treatment/monthly-workflow/upload', [HealthTreatmentController::class, 'uploadMonthlyEndorsement'])->middleware('permission:Treatment Record,view')->name('treatment.monthly-workflow.upload');
         Route::get('/treatment/monthly-workflow/download/{stepIndex}', [HealthTreatmentController::class, 'downloadMonthlyEndorsement'])->middleware('permission:Treatment Record,view')->name('treatment.monthly-workflow.download');
-        Route::delete('/treatment/monthly-workflow/{stepIndex}', [HealthTreatmentController::class, 'deleteMonthlyEndorsement'])->middleware('permission:Treatment Record,edit')->name('treatment.monthly-workflow.delete');
-        Route::post('/treatment/monthly-workflow/mark-completed', [HealthTreatmentController::class, 'markMonthlyCompleted'])->middleware('permission:Treatment Record,edit')->name('treatment.monthly-workflow.mark-completed');
-        Route::post('/treatment/monthly-workflow/reopen', [HealthTreatmentController::class, 'reopenMonthly'])->middleware('permission:Treatment Record,edit')->name('treatment.monthly-workflow.reopen');
+        Route::delete('/treatment/monthly-workflow/{stepIndex}', [HealthTreatmentController::class, 'deleteMonthlyEndorsement'])->middleware('permission:Treatment Record,view')->name('treatment.monthly-workflow.delete');
+        Route::post('/treatment/monthly-workflow/mark-completed', [HealthTreatmentController::class, 'markMonthlyCompleted'])->middleware('permission:Treatment Record,view')->name('treatment.monthly-workflow.mark-completed');
+        Route::post('/treatment/monthly-workflow/reopen', [HealthTreatmentController::class, 'reopenMonthly'])->middleware('permission:Treatment Record,view')->name('treatment.monthly-workflow.reopen');
 
         // Treatment Export Report
         Route::get('/treatment/export/report', [HealthTreatmentController::class, 'exportReport'])->middleware('permission:Treatment Record,view')->name('treatment.export-report');

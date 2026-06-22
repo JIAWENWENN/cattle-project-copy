@@ -66,10 +66,6 @@ const form = useForm({
     sire_category: '',
     sire_coat_colour: '',
 
-    // Milestones (Optional)
-    weaning_weight: '',
-    yearling_weight: '',
-
     // Additional
     status: 'Active',
     remarks: '',

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cattle;
-use App\Models\CattleBreedingRecord;
 use App\Models\Estate;
 use App\Models\Herd;
 use App\Models\AuditLog;
@@ -88,19 +87,10 @@ class DashboardController extends Controller
         ];
 
         $breedingStats = [
-            'total' => CattleBreedingRecord::count(),
-            'pregnant' => CattleBreedingRecord::whereNotNull('breeding_date')
-                ->whereNull('actual_calving_date')
-                ->count(),
-            'awaitingCalving' => CattleBreedingRecord::whereNotNull('expected_calving_date')
-                ->whereNull('actual_calving_date')
-                ->where('expected_calving_date', '<=', now()->addDays(30))
-                ->count(),
-            'byMethod' => CattleBreedingRecord::selectRaw('breeding_method, count(*) as count')
-                ->whereNotNull('breeding_method')
-                ->groupBy('breeding_method')
-                ->pluck('count', 'breeding_method')
-                ->toArray(),
+            'total' => 0,
+            'pregnant' => 0,
+            'awaitingCalving' => 0,
+            'byMethod' => [],
         ];
 
         $calvingStats = [
@@ -143,7 +133,7 @@ class DashboardController extends Controller
         $healthStats = [
             'total' => \App\Models\Treatment::where('status', 'completed')->count(),
             'pendingVaccinations' => \App\Models\Treatment::where('category', 'Vaccination')->where('status', 'pending')->count(),
-            'overdueTraatments' => \App\Models\Treatment::where('follow_up_required', true)->where('follow_up_done', false)->where('follow_up_date', '<', now())->count(),
+            'overdueTraatments' => 0,
             'underObservation' => Cattle::whereIn('general_condition', ['Poor', 'Sick'])->count(),
             'healthy' => Cattle::where('general_condition', 'Good')->orWhere('general_condition', 'Excellent')->count(),
         ];
@@ -303,20 +293,6 @@ class DashboardController extends Controller
         $upcomingEvents = collect([]);
 
         // 1. Expected Calvings
-        $expectedCalvings = \App\Models\CattleBreedingRecord::whereNotNull('expected_calving_date')
-            ->whereNull('actual_calving_date')
-            ->where('expected_calving_date', '>=', now())
-            ->with('cattle')
-            ->get();
-        foreach ($expectedCalvings as $calving) {
-            $upcomingEvents->push([
-                'type' => 'Expected Calving',
-                'title' => 'Cow #' . ($calving->cattle->tag_no ?? 'Unknown'),
-                'date' => $calving->expected_calving_date,
-                'icon' => 'Baby',
-                'color' => 'pink',
-            ]);
-        }
 
         // 2. Vaccination Due
         $vaccinations = \App\Models\Treatment::where('category', 'Vaccination')

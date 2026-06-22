@@ -271,15 +271,21 @@ const close = () => {
                         </div>
 
                         <!-- Confirm Password -->
-                        <div v-if="!isEditing">
+                        <div v-if="!isEditing || form.password">
                             <label class="block text-sm font-medium text-gray-900 mb-2">Confirm Password</label>
                             <input
                                 v-model="form.password_confirmation"
                                 type="password"
-                                placeholder="Re-enter the password"
+                                :placeholder="isEditing ? 'Re-enter the new password' : 'Re-enter the password'"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2F4F4F] focus:border-transparent text-sm"
-                                required
+                                :required="!isEditing || form.password.length > 0"
                             />
+                            <div v-if="form.password && form.password_confirmation && form.password !== form.password_confirmation" class="text-red-600 text-xs mt-1 font-medium flex items-center gap-1">
+                                <X class="w-3 h-3" /> Passwords do not match
+                            </div>
+                            <div v-else-if="form.password && form.password_confirmation && form.password === form.password_confirmation" class="text-green-600 text-xs mt-1 font-medium flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Passwords match
+                            </div>
                             <div v-if="form.errors.password_confirmation" class="text-red-600 text-xs mt-1">{{ form.errors.password_confirmation }}</div>
                         </div>
 

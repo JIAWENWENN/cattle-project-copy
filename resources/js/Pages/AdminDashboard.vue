@@ -663,7 +663,7 @@ onMounted(() => {
                             <span class="text-sm font-bold text-gray-900">{{ (inventoryStats.medications?.totalStock || 0).toLocaleString() }} units</span>
                         </div>
                         <div class="flex items-center justify-between py-2 border-b border-gray-100">
-                            <span class="text-sm text-gray-600">Expiring Soon</span>
+                            <span class="text-sm text-gray-600">Expiring Soon (30 Days)</span>
                             <span class="text-sm font-bold text-amber-600">{{ inventoryStats.medications?.expiringSoon || 0 }}</span>
                         </div>
                         <div class="flex items-center justify-between py-2">

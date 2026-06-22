@@ -152,7 +152,27 @@ const syncLivestockFromTag = (item) => {
 };
 
 const submitForm = () => {
-    form.put(`/transfer/receival/${doc.value.id}`);
+    if (!form.from_location) {
+        alert('Transfer from is required. Please select a location.');
+        return;
+    }
+    if (!form.to_location) {
+        alert('Transfer to is required. Please select a destination.');
+        return;
+    }
+    const tagNos = form.livestock.map(item => item.tag_no?.trim()).filter(Boolean);
+    const duplicates = tagNos.filter((tag, idx) => tagNos.indexOf(tag) !== idx);
+    if (duplicates.length > 0) {
+        alert(`Duplicate tag no. found: ${duplicates[0]}. Please remove duplicates before saving.`);
+        return;
+    }
+    form.put(`/transfer/receival/${doc.value.id}`, {
+        onSuccess: () => alert('Receival updated successfully'),
+        onError: (errors) => {
+            const message = Object.values(errors || {}).flat().join('\n') || 'Failed to update Receival';
+            alert(message);
+        }
+    });
 };
 
 const goBack = () => router.visit('/transfer/receival');
@@ -198,8 +218,8 @@ const goBack = () => router.visit('/transfer/receival');
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-500 mb-1">To location</label>
-                        <select v-model="form.to_location" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-[#34554a]">
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">To location *</label>
+                        <select v-model="form.to_location" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-[#34554a]" required>
                             <option value="">Select destination</option>
                             <option v-for="estate in $page.props.estates" :key="estate.id" :value="estate.name">{{ estate.name }}</option>
                         </select>

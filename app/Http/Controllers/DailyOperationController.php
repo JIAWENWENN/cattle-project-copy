@@ -738,6 +738,22 @@ class DailyOperationController extends Controller
             }
         }
 
+        $today = now();
+        $isCurrentMonth = ($month === $today->month && $year === $today->year);
+        $isFutureMonth = ($year > $today->year || ($year === $today->year && $month > $today->month));
+        $todayDayIndex = $today->day - 1;
+
+        if ($isCurrentMonth || $isFutureMonth) {
+            foreach ($dailyData as $code => &$data) {
+                for ($i = 0; $i < $daysInMonth; $i++) {
+                    if ($isFutureMonth || $i > $todayDayIndex) {
+                        $data['daily'][$i] = 0;
+                    }
+                }
+            }
+            unset($data);
+        }
+
         return $dailyData;
     }
 
@@ -963,29 +979,8 @@ class DailyOperationController extends Controller
             }
         }
 
-        $assignments = $this->getDomlWorkflowAssignments();
-        $keys = [
-            0 => 'pengembala_user_ids',
-            1 => 'pembantu_kanan_ternakan_user_ids',
-            2 => 'pembantu_kanan_keselamatan_user_ids',
-            3 => 'wakil_ladang_user_ids',
-        ];
-
-        for ($i = 0; $i < 4; $i++) {
-            if ($names[$i] !== '') {
-                continue;
-            }
-
-            $ids = is_array($assignments[$keys[$i]] ?? null) ? $assignments[$keys[$i]] : [];
-            if (empty($ids)) {
-                continue;
-            }
-
-            $user = User::query()->find((int) $ids[0]);
-            if ($user && trim((string) $user->name) !== '') {
-                $names[$i] = trim((string) $user->name);
-            }
-        }
+        // Automatically pre-filling duty person names from global workflow assignments
+        // has been removed. Fields will remain blank until explicitly filled or a document is uploaded.
 
         return $names;
     }

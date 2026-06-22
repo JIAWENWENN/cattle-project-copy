@@ -106,6 +106,15 @@ const canEditDoml = computed(() => {
 
 const isDomlLocked = computed(() => (canShowWorkflow.value && workflowIsCompleted.value) || !canEditDoml.value);
 
+const isDayLocked = (dayNumber) => {
+    if (isDomlLocked.value) return true;
+    if (!dayNumber) return true;
+    const currentDate = new Date();
+    const inputDate = new Date(selectedYear.value, selectedMonth.value - 1, dayNumber);
+    const today = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+    return inputDate > today;
+};
+
 const selectedWeekLabel = computed(() => {
     const match = weeks.find((w) => w.value === String(selectedWeek.value));
     return match?.label || `Week ${selectedWeek.value}`;
@@ -632,9 +641,9 @@ const reopenWorkflow = () => {
                                     v-if="!row.isTotal"
                                     v-model.number="editableMap[row.code].daily[idx]"
                                     type="number"
-                                    :disabled="isDomlLocked"
+                                    :disabled="isDayLocked(week1Days[idx]?.day)"
                                     class="w-14 border border-gray-200 rounded px-1 py-1 text-xs text-center"
-                                    :class="isDomlLocked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''"
+                                    :class="isDayLocked(week1Days[idx]?.day) ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''"
                                 />
                                 <span v-else>{{ val }}</span>
                             </td>
@@ -696,9 +705,9 @@ const reopenWorkflow = () => {
                                     v-if="!row.isTotal"
                                     v-model.number="editableMap[row.code].daily[idx + 7]"
                                     type="number"
-                                    :disabled="isDomlLocked"
+                                    :disabled="isDayLocked(week2Days[idx]?.day)"
                                     class="w-14 border border-gray-200 rounded px-1 py-1 text-xs text-center"
-                                    :class="isDomlLocked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''"
+                                    :class="isDayLocked(week2Days[idx]?.day) ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''"
                                 />
                                 <span v-else>{{ val }}</span>
                             </td>
@@ -760,9 +769,9 @@ const reopenWorkflow = () => {
                                     v-if="!row.isTotal"
                                     v-model.number="editableMap[row.code].daily[idx + 14]"
                                     type="number"
-                                    :disabled="isDomlLocked"
+                                    :disabled="isDayLocked(week3Days[idx]?.day)"
                                     class="w-14 border border-gray-200 rounded px-1 py-1 text-xs text-center"
-                                    :class="isDomlLocked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''"
+                                    :class="isDayLocked(week3Days[idx]?.day) ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''"
                                 />
                                 <span v-else>{{ val }}</span>
                             </td>
@@ -824,9 +833,9 @@ const reopenWorkflow = () => {
                                     v-if="!row.isTotal"
                                     v-model.number="editableMap[row.code].daily[idx + 21]"
                                     type="number"
-                                    :disabled="isDomlLocked"
+                                    :disabled="isDayLocked(week4Days[idx]?.day)"
                                     class="w-14 border border-gray-200 rounded px-1 py-1 text-xs text-center"
-                                    :class="isDomlLocked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''"
+                                    :class="isDayLocked(week4Days[idx]?.day) ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''"
                                 />
                                 <span v-else>{{ val }}</span>
                             </td>

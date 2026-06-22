@@ -135,6 +135,14 @@ const syncLivestockFromTag = (item) => {
 };
 
 const submitForm = () => {
+    if (!form.from_location) {
+        alert('Transfer from is required. Please select a location.');
+        return;
+    }
+    if (!form.to_location) {
+        alert('Transfer to is required. Please select a destination.');
+        return;
+    }
     const tagNos = form.livestock.map(item => item.tag_no?.trim()).filter(Boolean);
     const duplicates = tagNos.filter((tag, idx) => tagNos.indexOf(tag) !== idx);
     if (duplicates.length > 0) {

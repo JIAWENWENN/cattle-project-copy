@@ -103,13 +103,13 @@ const openTask = async (item) => {
             type="button"
         >
             <svg class="w-12 h-12 text-[#424242]" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <defs>
+                <defs v-if="unreadCount > 0">
                     <mask id="badge-cutout-notif">
                         <rect width="120" height="120" fill="white" />
                         <circle cx="94" cy="20" r="34" fill="black" />
                     </mask>
                 </defs>
-                <g mask="url(#badge-cutout-notif)">
+                <g :mask="unreadCount > 0 ? 'url(#badge-cutout-notif)' : undefined">
                     <path d="M56 30v-7a5 5 0 0 1 10 0v7c13 0 20 12 20 30s12 30 18 30H18c6 0 18-12 18-30s7-30 20-30h0Z" stroke="#424242" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
                     <path d="M50 90a12 12 0 0 0 24 0" stroke="#424242" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </g>

@@ -411,8 +411,36 @@ class TransferController extends Controller
 
     private function shouldMarkCattleAsSold(string $tagNo): bool
     {
-        return $this->tagHasCompletedTransferDocument($tagNo, TransferDocument::TYPE_SIV)
-            && $this->tagHasCompletedTransferDocument($tagNo, TransferDocument::TYPE_RECEIVAL);
+        $sivDocs = TransferDocument::query()
+            ->where('type', TransferDocument::TYPE_SIV)
+            ->where('status', TransferDocument::STATUS_COMPLETED)
+            ->whereHas('livestock', fn ($query) => $query->where('tag_no', $tagNo))
+            ->get();
+
+        if ($sivDocs->isEmpty()) {
+            return false;
+        }
+
+        $receivalDocs = TransferDocument::query()
+            ->where('type', TransferDocument::TYPE_RECEIVAL)
+            ->where('status', TransferDocument::STATUS_COMPLETED)
+            ->whereHas('livestock', fn ($query) => $query->where('tag_no', $tagNo))
+            ->get();
+
+        if ($receivalDocs->isEmpty()) {
+            return false;
+        }
+
+        foreach ($sivDocs as $siv) {
+            foreach ($receivalDocs as $receival) {
+                if ($siv->from_location === $receival->from_location &&
+                    $siv->to_location === $receival->to_location) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private function syncSoldStatusForTags(array $tagNos): void
@@ -617,7 +645,7 @@ class TransferController extends Controller
         return !empty($assignedUserIds) && in_array((int) $user->id, $assignedUserIds, true);
     }
 
-    private function getTransferCattleOptions()
+    private function getTransferCattleOptions(?int $excludeDocumentId = null)
     {
         $query = Cattle::where('status', 'Active')->orderBy('tag_no');
 
@@ -719,6 +747,49 @@ class TransferController extends Controller
 
         if (!empty($errors)) {
             throw \Illuminate\Validation\ValidationException::withMessages($errors);
+        }
+    }
+
+    private function validateLivestockNotInActiveTransfers(array $livestockRows, string $documentType, ?int $excludeDocumentId = null): void
+    {
+        $tagNos = [];
+        foreach ($livestockRows as $row) {
+            $tag = trim((string) ($row['tag_no'] ?? ''));
+            if ($tag !== '') {
+                $tagNos[] = $tag;
+            }
+        }
+        $tagNos = array_values(array_unique($tagNos));
+        if (empty($tagNos)) {
+            return;
+        }
+
+        $activeTransfers = TransferLivestock::query()
+            ->whereIn('tag_no', $tagNos)
+            ->whereHas('document', function ($query) use ($excludeDocumentId, $documentType) {
+                $query->where('type', $documentType);
+                $query->where('status', '!=', TransferDocument::STATUS_COMPLETED);
+                if ($excludeDocumentId) {
+                    $query->where('id', '!=', $excludeDocumentId);
+                }
+            })
+            ->with('document')
+            ->get();
+
+        if ($activeTransfers->isNotEmpty()) {
+            $errors = [];
+            foreach ($activeTransfers as $activeLivestock) {
+                $doc = $activeLivestock->document;
+                $docNo = $doc->document_no ?? $doc->id;
+                foreach ($livestockRows as $idx => $row) {
+                    if (trim((string) ($row['tag_no'] ?? '')) === $activeLivestock->tag_no) {
+                        $errors["livestock.$idx.tag_no"] = "Tag no. {$activeLivestock->tag_no} is already in an active {$documentType} document ({$docNo}).";
+                    }
+                }
+            }
+            if (!empty($errors)) {
+                throw \Illuminate\Validation\ValidationException::withMessages($errors);
+            }
         }
     }
 
@@ -893,7 +964,7 @@ private function typeHistory(Request $request, string $type, string $component)
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        $cattle = $this->getTransferCattleOptions();
+        $cattle = $this->getTransferCattleOptions($id);
 
         return Inertia::render('Transfer/EditSiv', [
             'document' => $document,
@@ -920,7 +991,7 @@ private function typeHistory(Request $request, string $type, string $component)
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        $cattle = $this->getTransferCattleOptions();
+        $cattle = $this->getTransferCattleOptions($id);
 
         return Inertia::render('Transfer/EditReceival', [
             'document' => $document,
@@ -936,7 +1007,7 @@ private function typeHistory(Request $request, string $type, string $component)
             'form_document_no' => 'nullable|string|max:100',
             'revision_no' => 'nullable|string|max:50',
             'from_location' => 'required|string|max:255',
-            'to_location' => 'nullable|string|max:255',
+            'to_location' => 'required|string|max:255',
             'date' => 'required|date',
             'time' => 'nullable',
             'vehicle_no' => 'nullable|string|max:50',
@@ -966,6 +1037,7 @@ private function typeHistory(Request $request, string $type, string $component)
             (array) ($validated['livestock'] ?? []),
             $validated['type'] ?? null
         );
+        $this->validateLivestockNotInActiveTransfers((array) ($validated['livestock'] ?? []), $validated['type']);
 
         $module = $this->getPermissionModuleForType($validated['type']);
         if (!$this->userHasModulePermission(Auth::user(), $module, 'create')) {
@@ -1160,7 +1232,7 @@ private function typeHistory(Request $request, string $type, string $component)
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        $cattle = $this->getTransferCattleOptions();
+        $cattle = $this->getTransferCattleOptions($id);
 
         return Inertia::render('Transfer/EditCtv', [
             'document' => $document,
@@ -1187,7 +1259,7 @@ private function typeHistory(Request $request, string $type, string $component)
             'form_document_no' => 'nullable|string|max:100',
             'revision_no' => 'nullable|string|max:50',
             'from_location' => 'required|string|max:255',
-            'to_location' => 'nullable|string|max:255',
+            'to_location' => 'required|string|max:255',
             'date' => 'required|date',
             'time' => 'nullable',
             'livestock' => 'required|array|min:1',
@@ -1206,6 +1278,7 @@ private function typeHistory(Request $request, string $type, string $component)
             (array) ($validated['livestock'] ?? []),
             TransferDocument::TYPE_CTV
         );
+        $this->validateLivestockNotInActiveTransfers((array) ($validated['livestock'] ?? []), TransferDocument::TYPE_CTV, $id);
 
         DB::transaction(function () use ($document, $validated) {
             $document->update([
@@ -1265,7 +1338,7 @@ private function typeHistory(Request $request, string $type, string $component)
 
         $validated = $request->validate([
             'from_location' => 'required|string|max:255',
-            'to_location' => 'nullable|string|max:255',
+            'to_location' => 'required|string|max:255',
             'date' => 'required|date',
             'time' => 'nullable',
             'vehicle_no' => 'nullable|string|max:50',
@@ -1291,6 +1364,7 @@ private function typeHistory(Request $request, string $type, string $component)
             (array) ($validated['livestock'] ?? []),
             TransferDocument::TYPE_SIV
         );
+        $this->validateLivestockNotInActiveTransfers((array) ($validated['livestock'] ?? []), TransferDocument::TYPE_SIV, $id);
 
         DB::transaction(function () use ($document, $validated) {
             $totalValue = 0;
@@ -1364,7 +1438,7 @@ private function typeHistory(Request $request, string $type, string $component)
 
         $validated = $request->validate([
             'from_location' => 'required|string|max:255',
-            'to_location' => 'nullable|string|max:255',
+            'to_location' => 'required|string|max:255',
             'date' => 'required|date',
             'time' => 'nullable',
             'vehicle_no' => 'nullable|string|max:50',
@@ -1391,6 +1465,7 @@ private function typeHistory(Request $request, string $type, string $component)
             (array) ($validated['livestock'] ?? []),
             TransferDocument::TYPE_RECEIVAL
         );
+        $this->validateLivestockNotInActiveTransfers((array) ($validated['livestock'] ?? []), TransferDocument::TYPE_RECEIVAL, $id);
 
         DB::transaction(function () use ($document, $validated) {
             $totalValue = 0;

@@ -130,9 +130,14 @@ class PerformanceSummaryCalculator
         }
 
         $estateName = $operatingUnit ?: $this->resolveOperatingUnitName($herd) ?: $herd;
-        $completedWeeks = $this->getCompletedDomlWeeks($estateName, $month, $year);
+        $targetDate = Carbon::create($year, $month, 1)->endOfMonth();
+        if ($targetDate->isFuture()) {
+            $targetDate = now();
+        }
+        $targetDayIndex = $targetDate->day - 1;
 
-        if (empty($completedWeeks)) {
+        $targetWeek = (int) min(4, floor($targetDayIndex / 7) + 1);
+        if (!$this->isDomlWeekWorkflowCompleted($estateName, $month, $year, $targetWeek)) {
             return $physical;
         }
 
@@ -150,12 +155,7 @@ class PerformanceSummaryCalculator
             }
 
             $values = array_slice(array_pad($entry->daily_values, $daysInMonth, 0), 0, $daysInMonth);
-
-            foreach ($completedWeeks as $week) {
-                foreach ($this->getWeekDayIndices($week, $daysInMonth) as $dayIndex) {
-                    $physical[$code] += (int) ($values[$dayIndex] ?? 0);
-                }
-            }
+            $physical[$code] = (int) ($values[$targetDayIndex] ?? 0);
         }
 
         return $physical;

@@ -156,7 +156,6 @@ class HealthTreatmentController extends Controller
             'operating_unit' => 'nullable|string|max:255',
             'colour' => 'nullable|string|max:100',
             'date' => 'required|date',
-            'week' => 'nullable|string|max:50',
             'symptoms' => 'required|string',
             'treatment' => 'required|string',
             'treatment_code' => 'nullable|string|max:100',
@@ -177,7 +176,6 @@ class HealthTreatmentController extends Controller
             'treatment_no' => $treatmentNo,
             'status' => 'pending',
             'current_step' => 'prepared',
-            'endorsement_step' => 0,
             'created_by' => $user->id,
         ]);
 
@@ -267,9 +265,7 @@ class HealthTreatmentController extends Controller
             $oldOperatingUnit = (string) ($treatment->operating_unit ?? '');
 
             $incomingData['status'] = 'pending';
-            $incomingData['endorsement_step'] = 0;
             $incomingData['current_step'] = 'prepared';
-            $incomingData['endorsement_documents'] = null;
             $incomingData['is_reopened'] = false;
 
             $this->resetMonthlyWorkflowByScope($oldDate, $oldOperatingUnit);
@@ -298,394 +294,7 @@ class HealthTreatmentController extends Controller
 
     /**
      * Upload endorsement document for a treatment record
-     */
-    public function uploadEndorsement(Request $request, $id)
-    {
-        $request->validate([
-            'signed_document' => 'required|file|mimes:pdf|max:20480',
-            'name' => 'required|string|max:255',
-            'date' => 'required|date',
-            'step_index' => 'required|integer|min:0|max:2', // 3 steps: 0-2
-        ]);
 
-        $treatment = Treatment::findOrFail($id);
-        $user = Auth::user();
-        $stepIndex = (int) $request->step_index;
-
-        // Check if user has permission for this step
-        if (!$this->userCanUploadWorkflowStep($user, $stepIndex)) {
-            return back()->withErrors(['error' => 'You do not have permission to upload for this step']);
-        }
-
-        // Get current endorsement documents as array for manipulation
-        $rawDocs = $treatment->endorsement_documents;
-        if (is_object($rawDocs)) {
-            $endorsementDocs = json_decode(json_encode($rawDocs), true) ?? [];
-        } elseif (is_array($rawDocs)) {
-            $endorsementDocs = $rawDocs;
-        } else {
-            $endorsementDocs = [];
-        }
-
-        $currentStep = $treatment->endorsement_step ?? 0;
-
-        // Block uploads if treatment is already completed
-        if ($treatment->status === 'completed') {
-            return back()->withErrors(['error' => 'This treatment record has been completed. No further uploads are allowed.']);
-        }
-
-        // Check if can upload (admin can upload any step while not completed)
-        if ($user->role === 'admin') {
-            $canUpload = true;
-        } else {
-            $nextStepKey = strval($stepIndex + 1);
-
-            // For steps 0-1: can upload at current step, OR re-upload if next person hasn't uploaded yet
-            // For step 2 (manager): can upload/re-upload anytime until admin marks as completed
-            if ($stepIndex === 2) {
-                // Manager (last step) - can upload/re-upload until treatment is completed
-                $canUpload = ($stepIndex <= $currentStep);
-            } else {
-                // Steps 0-1 - can upload at current step, OR re-upload if next hasn't uploaded
-                $canUpload = ($stepIndex === $currentStep) ||
-                             ($stepIndex < $currentStep && !isset($endorsementDocs[$nextStepKey]));
-            }
-        }
-
-        if (!$canUpload) {
-            return back()->withErrors(['error' => 'Cannot upload at this step']);
-        }
-
-        // Store the file
-        $file = $request->file('signed_document');
-        $filename = 'treatment_endorsement_' . $treatment->id . '_step' . $stepIndex . '_' . time() . '.pdf';
-        $path = $file->storeAs('treatment_endorsements', $filename, 'public');
-
-        // Remove previous file for this step when re-uploading
-        $stepKey = strval($stepIndex);
-        if (isset($endorsementDocs[$stepKey]['file_path']) && Storage::disk('public')->exists($endorsementDocs[$stepKey]['file_path'])) {
-            Storage::disk('public')->delete($endorsementDocs[$stepKey]['file_path']);
-        }
-
-        // Update endorsement documents - use string key for consistent JSON object
-        $endorsementDocs[$stepKey] = [
-            'name' => $request->name,
-            'date' => $request->date,
-            'file_path' => $path,
-            'uploaded_by' => $user->id,
-            'uploaded_at' => now()->toDateTimeString(),
-        ];
-
-        // Convert back to object for storage
-        $endorsementDocsObject = (object) $endorsementDocs;
-
-        // Move to next step if uploading at current step
-        $newStep = $currentStep;
-        if ($stepIndex === $currentStep && $stepIndex < 2) {
-            $newStep = $stepIndex + 1;
-        }
-
-        // If manager (step 2) uploads, set step to 3 (all uploaded, awaiting admin completion)
-        if ($stepIndex === 2) {
-            $newStep = 3; // All steps done, awaiting admin to mark as completed
-        }
-
-        // Update current_step field based on endorsement progress
-        $stepFields = ['prepared', 'checked', 'approved'];
-        $currentStepField = $stepFields[min($newStep, 2)] ?? 'approved';
-
-        // Update treatment - DO NOT auto-complete, admin must manually mark as completed
-        $treatment->update([
-            'endorsement_documents' => $endorsementDocsObject,
-            'endorsement_step' => $newStep,
-            'current_step' => $currentStepField,
-            'status' => 'under_review',
-        ]);
-
-// Notify users responsible for the next step (if not the last step and not admin)
-        if ($user->role !== 'admin' && $stepIndex === $currentStep && $stepIndex < 2) {
-            $nextStepIndex = $stepIndex + 1;
-            if (isset($this->workflowSteps[$nextStepIndex])) {
-                $nextStepRole = $this->workflowSteps[$nextStepIndex]['role'] ?? null;
-                $nextStepLabel = $this->workflowSteps[$nextStepIndex]['label'] ?? 'Next Step';
-                $currentStepLabel = $this->workflowSteps[$stepIndex]['label'] ?? 'Current Step';
-                
-                // Find users with role matching the next step
-                $usersToNotify = \App\Models\User::where('role', $nextStepRole)->get();
-                
-                foreach ($usersToNotify as $notifyUser) {
-                    \App\Services\WorkflowNotificationService::createNotification(
-                        'health_treatment',
-                        'treatment',
-                        $treatment->id,
-                        $nextStepRole, // action is the role needed
-                        'Treatment Workflow Step Completed',
-                        "The treatment workflow step '{$currentStepLabel}' has been completed. Please proceed with '{$nextStepLabel}'.",
-                        $notifyUser->id
-                    );
-                }
-            }
-        }
-        return back()->with('success', 'Document uploaded successfully');
-    }
-
-    /**
-     * Delete endorsement document for a step.
-     * Rule: uploader/step owner can delete only before next step is uploaded.
-     */
-    public function deleteEndorsement($id, $stepIndex)
-    {
-        $treatment = Treatment::findOrFail($id);
-        $user = Auth::user();
-        $stepIndex = (int) $stepIndex;
-
-        if ($stepIndex < 0 || $stepIndex > 2) {
-            return back()->withErrors(['error' => 'Invalid endorsement step']);
-        }
-
-        if ($treatment->status === 'completed') {
-            return back()->withErrors(['error' => 'Completed treatment is locked. Delete is not allowed.']);
-        }
-
-        if (!$this->userCanUploadWorkflowStep($user, $stepIndex)) {
-            return back()->withErrors(['error' => 'You do not have permission to delete this step']);
-        }
-
-        $rawDocs = $treatment->endorsement_documents;
-        if (is_object($rawDocs)) {
-            $endorsementDocs = json_decode(json_encode($rawDocs), true) ?? [];
-        } elseif (is_array($rawDocs)) {
-            $endorsementDocs = $rawDocs;
-        } else {
-            $endorsementDocs = [];
-        }
-
-        $stepKey = strval($stepIndex);
-        if (!isset($endorsementDocs[$stepKey])) {
-            return back()->withErrors(['error' => 'No uploaded document found for this step']);
-        }
-
-        $nextStepKey = strval($stepIndex + 1);
-        if ($stepIndex < 2 && isset($endorsementDocs[$nextStepKey]) && $user->role !== 'admin') {
-            return back()->withErrors(['error' => 'Cannot delete because the next step has already endorsed.']);
-        }
-
-        $filePath = $endorsementDocs[$stepKey]['file_path'] ?? null;
-        if ($filePath && Storage::disk('public')->exists($filePath)) {
-            Storage::disk('public')->delete($filePath);
-        }
-
-        unset($endorsementDocs[$stepKey]);
-
-        $has0 = isset($endorsementDocs['0']);
-        $has1 = isset($endorsementDocs['1']);
-        $has2 = isset($endorsementDocs['2']);
-
-        $newStep = 0;
-        $newCurrentStep = 'prepared';
-        $newStatus = 'pending';
-
-        if ($has0 && !$has1) {
-            $newStep = 1;
-            $newCurrentStep = 'checked';
-            $newStatus = 'under_review';
-        } elseif ($has0 && $has1 && !$has2) {
-            $newStep = 2;
-            $newCurrentStep = 'approved';
-            $newStatus = 'under_review';
-        } elseif ($has0 && $has1 && $has2) {
-            $newStep = 3;
-            $newCurrentStep = 'approved';
-            $newStatus = 'under_review';
-        }
-
-        $treatment->update([
-            'endorsement_documents' => (object) $endorsementDocs,
-            'endorsement_step' => $newStep,
-            'current_step' => $newCurrentStep,
-            'status' => $newStatus,
-        ]);
-
-        return back()->with('success', 'Endorsement document deleted successfully');
-    }
-
-    /**
-     * Admin: Mark treatment as completed (locks all uploads)
-     */
-    public function markAsCompleted($id)
-    {
-        $user = Auth::user();
-
-        // Only admin can mark as completed
-        if ($user->role !== 'admin') {
-            return back()->withErrors(['error' => 'Only admin can mark treatments as completed']);
-        }
-
-        $treatment = Treatment::findOrFail($id);
-
-        // Check if all 3 steps are uploaded
-        $rawDocs = $treatment->endorsement_documents;
-        if (is_object($rawDocs)) {
-            $endorsementDocs = json_decode(json_encode($rawDocs), true) ?? [];
-        } elseif (is_array($rawDocs)) {
-            $endorsementDocs = $rawDocs;
-        } else {
-            $endorsementDocs = [];
-        }
-
-        // Verify all 3 steps have documents
-        for ($i = 0; $i < 3; $i++) {
-            if (!isset($endorsementDocs[strval($i)])) {
-                return back()->withErrors(['error' => 'All 3 endorsement steps must be completed before marking as completed']);
-            }
-        }
-
-        $treatment->update([
-            'status' => 'completed',
-            'current_step' => 'approved',
-            'is_reopened' => false,
-        ]);
-
-        // Create notification for the person who prepared the treatment
-        if ($treatment->created_by) {
-            \App\Services\WorkflowNotificationService::createNotification(
-                'health_treatment',
-                'treatment',
-                $treatment->id,
-                'completed',
-                'Treatment Record Completed',
-                "Your treatment record #{$treatment->id} has been marked as completed.",
-                $treatment->created_by
-            );
-        }
-
-        $this->syncTreatmentToCattle($treatment->fresh());
-
-        return back()->with('success', 'Treatment record marked as completed. No further uploads are allowed.');
-    }
-
-    /**
-     * Admin: Reopen a completed treatment for further changes.
-     */
-    public function reopen($id)
-    {
-        $user = Auth::user();
-
-        if ($user->role !== 'admin') {
-            return back()->withErrors(['error' => 'Only admin can reopen treatments']);
-        }
-
-        $treatment = Treatment::findOrFail($id);
-
-        $rawDocs = $treatment->endorsement_documents;
-        if (is_object($rawDocs)) {
-            $endorsementDocs = json_decode(json_encode($rawDocs), true) ?? [];
-        } elseif (is_array($rawDocs)) {
-            $endorsementDocs = $rawDocs;
-        } else {
-            $endorsementDocs = [];
-        }
-
-        $has0 = isset($endorsementDocs['0']);
-        $has1 = isset($endorsementDocs['1']);
-        $has2 = isset($endorsementDocs['2']);
-
-        $newStep = 0;
-        $newCurrentStep = 'prepared';
-        $newStatus = 'pending';
-
-        if ($has0 && !$has1) {
-            $newStep = 1;
-            $newCurrentStep = 'checked';
-            $newStatus = 'under_review';
-        } elseif ($has0 && $has1 && !$has2) {
-            $newStep = 2;
-            $newCurrentStep = 'approved';
-            $newStatus = 'under_review';
-        } elseif ($has0 && $has1 && $has2) {
-            $newStep = 3;
-            $newCurrentStep = 'approved';
-            $newStatus = 'under_review';
-        }
-
-        $treatment->update([
-            'status' => $newStatus,
-            'endorsement_step' => $newStep,
-            'current_step' => $newCurrentStep,
-            'is_reopened' => true,
-        ]);
-        $this->syncTreatmentHealthRecord($treatment->fresh());
-
-        return back()->with('success', 'Treatment reopened successfully.');
-    }
-
-    /**
-     * Download endorsement document
-     */
-    public function downloadEndorsement($id, $stepIndex)
-    {
-        $treatment = Treatment::findOrFail($id);
-        $user = Auth::user();
-        $stepIndex = (int) $stepIndex;
-
-        // Check permission - can only view own step OR previous step (to download previous person's doc)
-        $userStepIndex = $this->getUserWorkflowStepIndex($user);
-        if ($userStepIndex === null && $user->role !== 'admin') {
-            abort(403, 'You do not have permission to view this document');
-        }
-
-        // User can view: their own step OR the immediately previous step only
-        if ($user->role !== 'admin') {
-            $canView = ($stepIndex === $userStepIndex) || ($stepIndex === $userStepIndex - 1);
-            if (!$canView) {
-                abort(403, 'You can only view your own document or the previous person\'s document');
-            }
-        }
-
-        // Get current endorsement documents as array
-        $rawDocs = $treatment->endorsement_documents;
-        if (is_object($rawDocs)) {
-            $endorsementDocs = json_decode(json_encode($rawDocs), true) ?? [];
-        } elseif (is_array($rawDocs)) {
-            $endorsementDocs = $rawDocs;
-        } else {
-            $endorsementDocs = [];
-        }
-        $stepKey = strval($stepIndex);
-
-        if (!isset($endorsementDocs[$stepKey])) {
-            abort(404, 'Document not found');
-        }
-
-        $filePath = $endorsementDocs[$stepKey]['file_path'];
-
-        if (!Storage::disk('public')->exists($filePath)) {
-            abort(404, 'File not found');
-        }
-
-        return Storage::disk('public')->download($filePath);
-    }
-
-    /**
-     * Generate and download Treatment Endorsement Form PDF
-     */
-    public function downloadEndorsementForm($id)
-    {
-        $treatment = Treatment::with(['cattle', 'creator'])->findOrFail($id);
-        if (!$treatment->date || trim((string) $treatment->operating_unit) === '') {
-            return back()->withErrors([
-                'error' => 'This treatment does not have a valid date or operating unit to generate the monthly report.',
-            ]);
-        }
-
-        $reportRequest = new Request([
-            'year' => (int) $treatment->date->format('Y'),
-            'month' => (int) $treatment->date->format('n'),
-            'operating_unit' => (string) $treatment->operating_unit,
-        ]);
-
-        return $this->exportReport($reportRequest);
-    }
 
     /**
      * Export treatment records report (PDF) by year/month and operating unit
@@ -728,17 +337,6 @@ class HealthTreatmentController extends Controller
 
         $rows = '';
         foreach ($records as $index => $record) {
-            $weekLabel = trim((string) ($record->week ?? ''));
-            if ($weekLabel === '' && $record->date) {
-                $dayOfMonth = (int) $record->date->format('j');
-                $weekNumber = (int) ceil($dayOfMonth / 7);
-                $weekLabel = 'Week ' . min(5, max(1, $weekNumber));
-            } elseif (is_numeric($weekLabel)) {
-                $weekLabel = 'Week ' . min(5, max(1, (int) $weekLabel));
-            } elseif ($weekLabel === '') {
-                $weekLabel = '-';
-            }
-
             $treatmentCode = trim((string) ($record->treatment_code ?: $record->treatment ?: '-'));
             $dosage = trim((string) ($record->dosage ?: ''));
             $treatmentAndDosage = $treatmentCode;
@@ -748,7 +346,6 @@ class HealthTreatmentController extends Controller
 
             $rows .= '<tr>
                 <td class="center">' . ($index + 1) . '</td>
-                <td class="center">' . e($weekLabel) . '</td>
                 <td class="center">' . e($record->date ? $record->date->format('d/m/Y') : '-') . '</td>
                 <td>' . e($record->tag_no ?: '-') . '</td>
                 <td>' . e($record->category ?: '-') . '</td>
@@ -760,7 +357,7 @@ class HealthTreatmentController extends Controller
         }
 
         if ($rows === '') {
-            $rows = '<tr><td colspan="9" class="empty">No treatment records found for the selected period and operating unit.</td></tr>';
+            $rows = '<tr><td colspan="8" class="empty">No treatment records found for the selected period and operating unit.</td></tr>';
         }
 
         $html = '
@@ -904,14 +501,13 @@ class HealthTreatmentController extends Controller
                 <thead>
                     <tr>
                         <th style="width:4%;">No.</th>
-                        <th style="width:6%;">Week</th>
-                        <th style="width:9%;">Date</th>
+                        <th style="width:10%;">Date</th>
                         <th style="width:12%;">Tag No.</th>
                         <th style="width:10%;">Category</th>
-                        <th style="width:9%;">Colour</th>
-                        <th style="width:18%;">Symptoms</th>
-                        <th style="width:17%;">Treatment (Code) / Dosage</th>
-                        <th style="width:15%;">Remarks</th>
+                        <th style="width:10%;">Colour</th>
+                        <th style="width:20%;">Symptoms</th>
+                        <th style="width:18%;">Treatment (Code) / Dosage</th>
+                        <th style="width:16%;">Remarks</th>
                     </tr>
                 </thead>
                 <tbody>' . $rows . '</tbody>
@@ -970,32 +566,36 @@ class HealthTreatmentController extends Controller
     private function getAssignedUserIdsForStep(int $stepIndex): array
     {
         $assignment = TreatmentWorkflowAssignment::first();
-        if (!$assignment) {
-            return [];
-        }
+        $ids = [];
 
-        $ids = match ($stepIndex) {
-            0 => $assignment->prepared_by_user_ids,
-            1 => $assignment->checked_by_user_ids,
-            2 => $assignment->approved_by_user_ids,
-            default => [],
-        };
-
-        if (!is_array($ids)) {
-            $ids = [];
-        }
-
-        // Backward compatibility with single-user columns
-        if (empty($ids)) {
-            $fallbackId = match ($stepIndex) {
-                0 => $assignment->prepared_by_user_id,
-                1 => $assignment->checked_by_user_id,
-                2 => $assignment->approved_by_user_id,
-                default => null,
+        if ($assignment) {
+            $assignedIds = match ($stepIndex) {
+                0 => $assignment->prepared_by_user_ids,
+                1 => $assignment->checked_by_user_ids,
+                2 => $assignment->approved_by_user_ids,
+                default => [],
             };
-            if ($fallbackId) {
-                $ids = [(int) $fallbackId];
+
+            if (is_array($assignedIds)) {
+                $ids = $assignedIds;
             }
+
+            // Backward compatibility with single-user columns
+            if (empty($ids)) {
+                $fallbackId = match ($stepIndex) {
+                    0 => $assignment->prepared_by_user_id,
+                    1 => $assignment->checked_by_user_id,
+                    2 => $assignment->approved_by_user_id,
+                    default => null,
+                };
+                if ($fallbackId) {
+                    $ids = [(int) $fallbackId];
+                }
+            }
+        }
+
+        if (empty($ids)) {
+            $ids = \App\Models\User::whereIn('role', ['admin', 'Admin'])->pluck('id')->toArray();
         }
 
         return array_values(array_unique(array_map('intval', $ids)));
@@ -1079,24 +679,27 @@ class HealthTreatmentController extends Controller
         $nextStepLabel = $this->workflowSteps[$nextStepIndex]['label'] ?? 'Next Step';
         $message = "Monthly treatment workflow for {$operatingUnit} ({$month}/{$year}) is now waiting for {$nextStepLabel}.";
 
-        foreach (array_unique(array_map('intval', $userIds)) as $userId) {
-            $alreadyNotified = TaskNotification::where('user_id', $userId)
-                ->where('type', 'treatment_monthly_workflow_step_ready')
-                ->where('message', $message)
-                ->exists();
+        // Clear previous identical unread notifications to avoid confusion
+        \App\Models\TaskNotification::where('type', 'workflow')
+            ->where('title', 'Treatment Workflow Step Ready')
+            ->where('message', $message)
+            ->where('is_read', false)
+            ->update(['is_read' => true, 'read_at' => now()]);
 
-            if ($alreadyNotified) {
+        foreach (array_unique(array_map('intval', $userIds)) as $userId) {
+            if ($userId === $createdBy) {
                 continue;
             }
 
-            TaskNotification::create([
-                'user_id' => $userId,
-                'title' => 'Treatment Workflow Step Ready',
-                'message' => $message,
-                'type' => 'treatment_monthly_workflow_step_ready',
-                'is_read' => false,
-                'created_by' => $createdBy,
-            ]);
+            \App\Services\WorkflowNotificationService::createNotification(
+                'health_treatment',
+                'treatment_monthly_workflow',
+                $year * 100 + $month, // just a dummy entity ID since monthly workflow doesn't have a single ID easily accessible here
+                'workflow_step_ready',
+                'Treatment Workflow Step Ready',
+                $message,
+                $userId
+            );
         }
     }
 
@@ -1106,23 +709,19 @@ class HealthTreatmentController extends Controller
         $message = "All monthly treatment workflow steps for {$operatingUnit} ({$month}/{$year}) have been uploaded. Please review and mark as complete.";
 
         foreach ($adminUsers as $adminUser) {
-            $alreadyNotified = TaskNotification::where('user_id', (int) $adminUser->id)
-                ->where('type', 'treatment_monthly_workflow_ready_for_completion')
-                ->where('message', $message)
-                ->exists();
-
-            if ($alreadyNotified) {
+            if ((int) $adminUser->id === $createdBy) {
                 continue;
             }
 
-            TaskNotification::create([
-                'user_id' => (int) $adminUser->id,
-                'title' => 'Treatment Workflow Ready for Completion',
-                'message' => $message,
-                'type' => 'treatment_monthly_workflow_ready_for_completion',
-                'is_read' => false,
-                'created_by' => $createdBy,
-            ]);
+            \App\Services\WorkflowNotificationService::createNotification(
+                'health_treatment',
+                'treatment_monthly_workflow',
+                $year * 100 + $month,
+                'workflow_ready_for_completion',
+                'Treatment Workflow Ready for Completion',
+                $message,
+                (int) $adminUser->id
+            );
         }
     }
 
@@ -1229,7 +828,7 @@ class HealthTreatmentController extends Controller
         $workflow->save();
 
         $newStep = (int) ($workflow->endorsement_step ?? 0);
-        if ($newStep > $currentStep && $newStep <= 2) {
+        if ($newStep <= 2) {
             $this->notifyNextTreatmentMonthlyStepUsers(
                 $newStep,
                 (int) $validated['month'],
@@ -1369,14 +968,15 @@ class HealthTreatmentController extends Controller
         $adminUsers = \App\Models\User::where('role', 'admin')->get();
         
         foreach ($adminUsers as $adminUser) {
-            \App\Models\TaskNotification::create([
-                'user_id' => $adminUser->id,
-                'title' => 'Monthly Treatment Workflow Completed',
-                'message' => "The monthly treatment workflow for {$operatingUnit} ({$month}/{$year}) has been marked as completed.",
-                'type' => 'treatment_monthly_workflow_completed',
-                'is_read' => false,
-                'created_by' => auth()->id(),
-            ]);
+            \App\Services\WorkflowNotificationService::createNotification(
+                'health_treatment',
+                'treatment_monthly_workflow',
+                $year * 100 + $month,
+                'workflow_completed',
+                'Monthly Treatment Workflow Completed',
+                "The monthly treatment workflow for {$operatingUnit} ({$month}/{$year}) has been marked as completed.",
+                (int) $adminUser->id
+            );
         }
 
         return back()->with('success', 'Monthly workflow marked as completed.');
@@ -1424,7 +1024,7 @@ class HealthTreatmentController extends Controller
         $counts = [
             'total_pending' => Treatment::whereIn('status', ['pending', 'under_review'])->count(),
             'my_tasks' => 0,
-            'awaiting_completion' => Treatment::where('endorsement_step', 3)->whereIn('status', ['pending', 'under_review'])->count(),
+            'awaiting_completion' => TreatmentMonthlyWorkflow::where('endorsement_step', 3)->whereIn('status', ['pending', 'under_review'])->count(),
         ];
 
         // Count tasks for current user based on role
@@ -1435,7 +1035,7 @@ class HealthTreatmentController extends Controller
         ];
 
         if (isset($roleStepMap[$user->role])) {
-            $counts['my_tasks'] = Treatment::where('endorsement_step', $roleStepMap[$user->role])
+            $counts['my_tasks'] = TreatmentMonthlyWorkflow::where('endorsement_step', $roleStepMap[$user->role])
                 ->whereIn('status', ['pending', 'under_review'])
                 ->count();
         }
@@ -1661,6 +1261,36 @@ class HealthTreatmentController extends Controller
             'is_completed' => false,
             'completed_at' => null,
         ]);
+
+        // Clear any old unread notifications for this workflow
+        $messagePrefix = "Monthly treatment workflow for {$unit} ({$workflowDate->month}/{$workflowDate->year})";
+        \App\Models\TaskNotification::where('type', 'workflow')
+            ->where('message', 'like', "{$messagePrefix}%")
+            ->where('is_read', false)
+            ->update(['is_read' => true, 'read_at' => now()]);
+
+        // Notify Step 0 users that the workflow has been reset and needs to be prepared again
+        $step0UserIds = $this->getAssignedUserIdsForStep(0);
+        $resetMessage = "{$messagePrefix} has been updated/reset. Please prepare and upload the document again.";
+        
+        $currentUserId = Auth::id();
+
+        foreach (array_unique(array_map('intval', $step0UserIds)) as $userId) {
+            // Don't notify the person who just did the action (e.g. the one who edited the record)
+            if ($userId === $currentUserId) {
+                continue;
+            }
+
+            \App\Services\WorkflowNotificationService::createNotification(
+                'health_treatment',
+                'treatment_monthly_workflow',
+                $workflowDate->year * 100 + $workflowDate->month,
+                'workflow_restarted',
+                'Treatment Workflow Restarted',
+                $resetMessage,
+                $userId
+            );
+        }
     }
 
     private function isMonthlyWorkflowCompleted(?string $date, ?string $operatingUnit): bool

@@ -266,10 +266,6 @@ $sireColours = collect(array_merge(
             'sire_category' => 'nullable|string|max:255',
             'sire_coat_colour' => 'nullable|string|max:255',
 
-            // Milestones (Optional)
-            'weaning_weight' => 'nullable|numeric|min:0',
-            'yearling_weight' => 'nullable|numeric|min:0',
-
             // Additional
             'status' => 'nullable|in:Active,Sold,Deceased,Missing',
             'remarks' => 'nullable|string',
@@ -314,10 +310,6 @@ $sireColours = collect(array_merge(
             'sire_category' => 'nullable|string|max:255',
             'sire_coat_colour' => 'nullable|string|max:255',
 
-            // Milestones (Optional)
-            'weaning_weight' => 'nullable|numeric|min:0',
-            'yearling_weight' => 'nullable|numeric|min:0',
-
             // Additional
             'status' => 'nullable|in:Active,Sold,Deceased,Missing',
             'remarks' => 'nullable|string',
@@ -346,7 +338,7 @@ $sireColours = collect(array_merge(
 
     public function show(Cattle $cattle)
     {
-        $cattle->load(['movements.document', 'breedingRecords']);
+        $cattle->load(['movements.document']);
 
         $healthRecords = CattleHealthRecord::query()
             ->where('cattle_id', $cattle->id)
@@ -509,8 +501,8 @@ $sireColours = collect(array_merge(
             'Tag No', 'Category', 'Coat Colour', 'Birth Date', 'Gender',
             'Receival Weight', 'General Condition',
             'Location Block', 'Location Phase', 'Dam Tag', 'Dam Category', 'Dam Colour',
-            'Sire Tag', 'Sire Category', 'Sire Coat Colour', 'Weaning Weight',
-            'Yearling Weight', 'Status', 'Remarks', 'Created At'
+            'Sire Tag', 'Sire Category', 'Sire Coat Colour',
+            'Status', 'Remarks', 'Created At'
         ];
 
         $rows = [];
@@ -531,8 +523,6 @@ $sireColours = collect(array_merge(
                 $cattle->sire_tag,
                 $cattle->sire_category,
                 $cattle->sire_coat_colour,
-                $cattle->weaning_weight,
-                $cattle->yearling_weight,
                 $cattle->status,
                 $cattle->remarks,
                 $cattle->created_at
@@ -570,8 +560,7 @@ $sireColours = collect(array_merge(
             'E1' => 'Gender', 'F1' => 'Receival Weight', 'G1' => 'General Condition', 'H1' => 'Location Block',
             'I1' => 'Location Phase', 'J1' => 'Dam Tag', 'K1' => 'Dam Category',
             'L1' => 'Dam Colour', 'M1' => 'Sire Tag', 'N1' => 'Sire Category',
-            'O1' => 'Sire Coat Colour', 'P1' => 'Weaning Weight', 'Q1' => 'Yearling Weight',
-            'R1' => 'Status', 'S1' => 'Remarks', 'T1' => 'Created At'
+            'O1' => 'Sire Coat Colour', 'P1' => 'Status', 'Q1' => 'Remarks', 'R1' => 'Created At'
         ];
 
         foreach ($headers as $cell => $value) {
@@ -579,7 +568,7 @@ $sireColours = collect(array_merge(
         }
 
         // Style the header row
-        $sheet->getStyle('A1:T1')->applyFromArray([
+        $sheet->getStyle('A1:R1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['argb' => 'FFFFFFFF'],
@@ -613,16 +602,14 @@ $sireColours = collect(array_merge(
             $sheet->setCellValue('M' . $row, $cattle->sire_tag);
             $sheet->setCellValue('N' . $row, $cattle->sire_category);
             $sheet->setCellValue('O' . $row, $cattle->sire_coat_colour);
-            $sheet->setCellValue('P' . $row, $cattle->weaning_weight);
-            $sheet->setCellValue('Q' . $row, $cattle->yearling_weight);
-            $sheet->setCellValue('R' . $row, $cattle->status);
-            $sheet->setCellValue('S' . $row, $cattle->remarks);
-            $sheet->setCellValue('T' . $row, $cattle->created_at);
+            $sheet->setCellValue('P' . $row, $cattle->status);
+            $sheet->setCellValue('Q' . $row, $cattle->remarks);
+            $sheet->setCellValue('R' . $row, $cattle->created_at);
             $row++;
         }
 
         // Auto-size columns
-        foreach (range('A', 'T') as $col) {
+        foreach (range('A', 'R') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
 
@@ -703,10 +690,10 @@ $sireColours = collect(array_merge(
             'Tag No', 'Category', 'Gender', 'Wt(kg)',
             'Coat Colour', 'Birth', 'Cond.', 'Status',
             'Unit', 'Block', 'Phase', 'General',
-            'Dam', 'Sire', 'Wean Wt', 'Yr Wt'
+            'Dam', 'Sire'
         ];
         // Reduced widths to fit all columns on landscape A4
-        $widths = [20, 16, 14, 16, 20, 18, 16, 18, 20, 16, 14, 18, 16, 16, 16, 16];
+        $widths = [20, 16, 14, 16, 20, 18, 16, 18, 20, 16, 14, 18, 16, 16];
         
         foreach ($headers as $i => $header) {
             $pdf->Cell($widths[$i], 6, $header, 1, 0, 'C', true);
@@ -752,8 +739,6 @@ $sireColours = collect(array_merge(
             $pdf->Cell($widths[11], 5, substr($cattle->general_condition ?: '-', 0, 8), 1, 0, 'L', $fill);
             $pdf->Cell($widths[12], 5, substr($cattle->dam_tag ?: '-', 0, 8), 1, 0, 'L', $fill);
             $pdf->Cell($widths[13], 5, substr($cattle->sire_tag ?: '-', 0, 8), 1, 0, 'L', $fill);
-            $pdf->Cell($widths[14], 5, $cattle->weaning_weight ?: '-', 1, 0, 'C', $fill);
-            $pdf->Cell($widths[15], 5, $cattle->yearling_weight ?: '-', 1, 0, 'C', $fill);
             
             $pdf->Ln();
             $fill = !$fill;

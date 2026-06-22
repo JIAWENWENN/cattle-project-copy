@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('treatments', function (Blueprint $table) {
-            $table->dropColumn('endorsement_documents');
-            $table->dropColumn('endorsement_step');
+            if (Schema::hasColumn('treatments', 'endorsement_documents')) {
+                $table->dropColumn('endorsement_documents');
+            }
+            if (Schema::hasColumn('treatments', 'endorsement_step')) {
+                $table->dropColumn('endorsement_step');
+            }
         });
     }
 
